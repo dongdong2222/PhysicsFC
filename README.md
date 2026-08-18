@@ -1,6 +1,6 @@
 # PhysicsFC: Learning User-Controlled Skills for a Physics-Based Football Player Controller
 
-[![PhysicsFC teaser](images/teaser-physicsfc.jpg)](https://youtu.be/OQjIdFQ0g20?si=oeR0Rjspv9ZnEu46)
+[![PhysicsFC teaser](images/PhysicsFC__SIGGRAPH_2025.gif)](https://youtu.be/OQjIdFQ0g20?si=oeR0Rjspv9ZnEu46)
 
 [Paper (ACM TOG 2025)](https://doi.org/10.1145/3731425)
 
