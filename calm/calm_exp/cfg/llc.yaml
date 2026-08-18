@@ -1,0 +1,45 @@
+name: calm
+separate: True
+
+space:
+  continuous:
+    mu_activation: None
+    sigma_activation: None
+    mu_init:
+      name: default
+    sigma_init:
+      name: const_initializer
+      val: -2.9
+    fixed_sigma: True
+    learn_sigma: False
+
+mlp:
+  units: [1024, 1024, 512]
+  activation: relu
+  d2rl: False
+
+  initializer:
+    name: default
+  regularizer:
+    name: None
+
+disc:
+  units: [1024, 1024, 512]
+  activation: relu
+
+  initializer:
+    name: default
+
+conditional_disc:
+  units: [1024, 1024, 512]
+  activation: relu
+
+  initializer:
+    name: default
+
+enc:
+  units: [1024, 1024, 512]
+  activation: relu
+
+  initializer:
+    name: default

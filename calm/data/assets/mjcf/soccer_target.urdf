@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<robot name="object">
+  
+  <!-- target link -->
+  <link name="target">
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <sphere radius=".11"/>
+      </geometry>
+      <material name="mat">
+        <color rgba="1.0 0.0 0.0 0.25"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <sphere radius=".0"/>
+      </geometry>
+    </collision>
+  </link>
+
+</robot>

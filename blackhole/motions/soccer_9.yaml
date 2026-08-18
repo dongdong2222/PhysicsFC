@@ -1,0 +1,19 @@
+motions:
+- file: AA_Soccer_Player_FootStop_ML_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_GShoot_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_ChestStop_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_Jump_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FPass_P1_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DSpeedUp_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogR_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogL_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_RunF_RF_calm.npy
+  weight: 0.2

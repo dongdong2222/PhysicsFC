@@ -1,0 +1,90 @@
+params:
+  seed: -1
+
+  algo:
+    name: hrl
+
+  model:
+    name: hrl
+
+  network:
+    name: hrl
+    separate: True
+
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: -2.3
+        fixed_sigma: True
+        learn_sigma: False
+
+    mlp:
+      units: [1024, 512]
+      activation: relu
+      d2rl: False
+
+      initializer:
+        name: default
+      regularizer:
+        name: None
+        
+  load_checkpoint: False
+
+  config:
+    name: Humanoid
+    env_name: rlgpu
+    multi_gpu: False
+    ppo: True
+    mixed_precision: False
+    normalize_input: True
+    normalize_value: True
+    reward_shaper:
+      scale_value: 1
+    normalize_advantage: True
+    gamma: 0.99
+    tau: 0.95
+    learning_rate: 2e-5
+    lr_schedule: constant
+    score_to_win: 20000
+    max_epochs: 10
+    save_best_after: 10
+    save_frequency: 50
+    print_stats: True
+    grad_norm: 1.0
+    entropy_coef: 0.0
+    truncate_grads: False
+    ppo: True
+    e_clip: 0.2
+    horizon_length: 32
+    minibatch_size: 128 #16384
+    mini_epochs: 6
+    critic_coef: 5
+    clip_value: Falsehrl
+    seq_len: 4
+    bounds_loss_coef: 10
+    
+    task_reward_w: 1.0
+    disc_reward_w: 0.0
+    style_reward_w: 0.0
+
+    llc_steps: 1
+    llc_config: calm/data/cfg/train/rlg/calm_humanoid.yaml
+
+    # for test
+    mode: RUN_TEACHER # choose - COLLECT_TEACHER, RUN_TEACHER, RUN_STUDENT, COLLECT_MATCHING_DB, TRAIN_REFINE, COLLECT_INIT_CONDITION, EVALUATE
+    exp_path: './blackhole/init_states/move' # './blackhole/distill/move_3M' # only on COLLECT_TEACHER. to save
+    student_ckpt: './blackhole/distill/dribble_high_lr.pth' #'/workspace/CALM/output/student_dribble_1_4.pth' # only on RUN_STUDENT
+    collect_n_games: 8 # only on COLLECT_TEACHER
+    collect_max_steps: 100 # only on COLLECT_TEACHER
+    input_size: 237 # HLC observation size
+    db_name: feature_move_test
+    db_size: 1000
+
+    NEAREST_MOTION_TEST: False
+
+    

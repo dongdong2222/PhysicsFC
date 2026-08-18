@@ -1,0 +1,2 @@
+task,char_tgt_move_dir_mean,char_tgt_move_dir_std,char_tgt_forward_dir_mean,char_tgt_forward_dir_std,char_tgt_speed_mean,char_tgt_speed_std,char_tgt_move_dir_gain_time_mean,char_tgt_move_dir_gain_time_std,char_tgt_move_dir_gain_time_rate,char_tgt_forward_dir_gain_time_mean,char_tgt_forward_dir_gain_time_std,char_tgt_forward_dir_gain_time_rate,char_tgt_speed_gain_time_mean,char_tgt_speed_gain_time_std,char_tgt_speed_gain_time_rate
+move,0.48974099192110443,0.3858249930568271,[],[],[],[],0.3059247236284362,0.1384417353306932,0.5,[],[],[],[],[],[]

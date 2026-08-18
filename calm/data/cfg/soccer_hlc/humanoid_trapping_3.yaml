@@ -1,0 +1,63 @@
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 5
+  episodeLength: 60
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Default"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  numAMPEncObsSteps: 60
+  
+  localRootObs: True
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  # contactBodies: ["right_foot", "left_foot", "head", "torso", "right_thigh", "left_thigh", "right_shin", "left_shin"]
+  contactBodies: ["right_foot", "left_foot", "right_thigh", "right_shin", "left_thigh", "left_shin"]
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+
+  headingChangeStepsMin: 100
+  headingChangeStepsMax: 200
+  enableRandHeading: True
+  enableTaskObs: True
+  initialBallDistMin: 10 # 1
+  initialBallDistMax: 15 # 3
+  initialBallSpeedMin: 5 # 0.5
+  initialBallSpeedMax: 10 # 3.
+  initialBallHeightMin: 0
+  initialBallHeightMax: 4
+  initialBallSpeedZMin: 0 #-1.5
+  initialBallSpeedZMax: 2 #0.5
+  tarSpeedMin: .5 #1.5
+  tarSpeedMax: 5 #1.6
+
+  asset:
+    assetRoot: "calm/data/assets"
+    assetFileName: "mjcf/amp_humanoid_shoe.xml"
+
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.2
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

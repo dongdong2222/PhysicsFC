@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<robot name="object">
+  
+  <!-- ball link -->
+  <link name="ball">
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="soccer_ball.dae" scale="0.11 0.11 0.11"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <sphere radius=".11"/>
+
+      </geometry>
+    </collision>
+
+    <!-- <inertial>
+      <mass value="0.045"/>
+      <mass value="1"/>
+      <inertia ixx="0.4" ixy="0.0" ixz="0.0" iyy="0.4" iyz="0.0" izz="0.4"/>
+    </inertial> -->
+
+  </link>
+
+</robot>

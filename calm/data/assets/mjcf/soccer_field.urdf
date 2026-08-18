@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<robot name="object">
+  <link name="field">
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="soccer_field.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="soccer_field.obj" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>

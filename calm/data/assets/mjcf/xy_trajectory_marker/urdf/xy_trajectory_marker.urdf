@@ -1,0 +1,154 @@
+<robot name="xy_trajectory_marker" version="1.0">
+  <joint name="traj_0_x_joint" type="prismatic">
+    <limit lower="0.00000" upper="100.00000" velocity="0.001"/>
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+    <parent link="root"/>
+    <child link="traj_0_x"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+  </joint>
+  <joint name="traj_1_x_joint" type="prismatic">
+    <limit lower="0.00000" upper="100.00000" velocity="0.001"/>
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+    <parent link="root"/>
+    <child link="traj_1_x"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+  </joint>
+  <joint name="traj_2_x_joint" type="prismatic">
+    <limit lower="0.00000" upper="100.00000" velocity="0.001"/>
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+    <parent link="root"/>
+    <child link="traj_2_x"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+  </joint>
+  <joint name="traj_3_x_joint" type="prismatic">
+    <limit lower="0.00000" upper="100.00000" velocity="0.001"/>
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+    <parent link="root"/>
+    <child link="traj_3_x"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+  </joint>
+  <joint name="traj_4_x_joint" type="prismatic">
+    <limit lower="0.00000" upper="100.00000" velocity="0.001"/>
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+    <parent link="root"/>
+    <child link="traj_4_x"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+  </joint>
+
+
+
+  <link name="root">
+    <collision name="traj_2_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.10000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00000" ixy="0.00000" ixz="0.00000" iyy="0.00000" iyz="0.00000" izz="0.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="0.00100"/>
+    </inertial>
+    <visual name="traj_0">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="traj_0_x">
+    <collision name="traj_0_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.10000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00000" ixy="0.00000" ixz="0.00000" iyy="0.00000" iyz="0.00000" izz="0.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="0.00100"/>
+    </inertial>
+    <visual name="traj_0">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="traj_1_x">
+    <collision name="traj_1_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.10000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00000" ixy="0.00000" ixz="0.00000" iyy="0.00000" iyz="0.00000" izz="0.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="0.00100"/>
+    </inertial>
+    <visual name="traj_1">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="traj_2_x">
+    <collision name="traj_2_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.10000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00000" ixy="0.00000" ixz="0.00000" iyy="0.00000" iyz="0.00000" izz="0.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="0.00100"/>
+    </inertial>
+    <visual name="traj_2">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="traj_3_x">
+    <collision name="traj_3_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.10000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00000" ixy="0.00000" ixz="0.00000" iyy="0.00000" iyz="0.00000" izz="0.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="0.00100"/>
+    </inertial>
+    <visual name="traj_3">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="traj_4_x">
+    <collision name="traj_4_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.10000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00000" ixy="0.00000" ixz="0.00000" iyy="0.00000" iyz="0.00000" izz="0.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="0.00100"/>
+    </inertial>
+    <visual name="traj_4">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <sphere radius="0.05000"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>

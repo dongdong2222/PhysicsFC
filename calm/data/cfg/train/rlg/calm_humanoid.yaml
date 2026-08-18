@@ -1,0 +1,124 @@
+params:
+  seed: -1 #무작위 시드값 사용
+
+  algo:
+    name: calm # 프로젝트 코드 내 특정 파일에 정의된 클래스 or 함수
+
+  model:
+    name: calm # 프로젝트 코드 내 특정 파일에 정의된 클래스 or 함수
+
+  network:
+    name: calm 
+    separate: True # 정책 network와 가치 network를 별개의 네트워크로 구성할지 여부
+
+    space: # 행동 공간에 대한 설정
+      continuous:
+        mu_activation: None # 행동 분포의 평균을 계산할 때 사용할 활성화 함수, None -> 별도로 사용X
+        sigma_activation: None #행동 분포의 표준편차를 계산할 때 사용할 활성화 함수
+        mu_init: # 평균 출력 network의 가중치 초기화
+          name: default
+        sigma_init: # 표준편차 출력 network의 가중치 초기화
+          name: const_initializer # 상수 값으로 초기화
+          val: -2.9 
+        fixed_sigma: True # 표준편차 고정 여부
+        learn_sigma: False # 표준편차 학습할지 여부 (X)
+
+    mlp: # 정책, 가치 네트워크 설정
+      units: [1024, 1024, 512]
+      activation: relu
+      d2rl: False #d2RL 스타일의 네트워크 사용할지
+
+      initializer:
+        name: default
+      regularizer:
+        name: None
+
+    disc: # 판별자 네트워크 설정
+      units: [1024, 1024, 512]
+      activation: relu
+
+      initializer:
+        name: default
+
+    conditional_disc: # 조건부 판별자 네트위크 설정
+      units: [1024, 1024, 512]
+      activation: relu
+
+      initializer:
+        name: default
+
+    enc: # 인코더 네트워크 설정
+      units: [1024, 1024, 512]
+      activation: relu
+
+      initializer:
+        name: default
+
+  load_checkpoint: False
+
+  #학숩 알고리즘과 환경에 대한 구체적인 파라미터
+  config:
+    name: Humanoid # 학습 설정 이름
+    env_name: rlgpu # 사용할 환경 이름
+    multi_gpu: False
+    ppo: True # PPO 사용
+    mixed_precision: True
+    normalize_input: True #입력 정규화 모드
+    normalize_value: True #가치값 정규화 모드
+    reward_shaper:
+      scale_value: 1 # 보상값에 곱해지는 scale값
+    normalize_advantage: True # Advantage 정규화 모드 
+    gamma: 0.99 # discount factor
+    tau: 0.95 # GAE(Generalized Advantage Estimation)계산에 사용되는 파라미터
+    learning_rate: 2e-5 
+    lr_schedule: constant #학습률 스케줄링, cnostant -> 학습률 고정
+    score_to_win: 20000
+    max_epochs: 100000 # 최대 epochs
+    save_best_after: 50 # 50 epochs 이후에 최고의 모델저장
+    save_frequency: 50 # 50 epochs마다 모델 저장
+    save_intermediate: True
+    print_stats: True
+    grad_norm: 1.0 #  clipping 임계값
+    entropy_coef: 0.0 # 엔트로피 보너스 가중치, exploration 장려
+    truncate_grads: False # 
+    ppo: True
+    e_clip: 0.2
+    horizon_length: 32 #8
+    minibatch_size: 16384 #1024
+    mini_epochs: 6 #1
+    critic_coef: 5
+    clip_value: False
+    seq_len: 4
+    bounds_loss_coef: 10
+    amp_obs_demo_buffer_size: 20000
+    amp_replay_buffer_size: 20000
+    amp_replay_keep_prob: 0.01
+    amp_batch_size: 512 #512
+    amp_minibatch_size: 4096 #1024
+    disc_coef: 5관
+    disc_logit_reg: 0.01
+    disc_grad_penalty: 5
+    disc_reward_scale: 2
+    disc_weight_decay: 0.0001
+    conditional_disc_coef: 5
+    conditional_disc_logit_reg: 0.01
+    conditional_disc_grad_penalty: 5
+    conditional_disc_reward_scale: 2
+    conditional_disc_weight_decay: 0.0001
+    normalize_amp_input: True
+    enable_eps_greedy: True
+    negative_disc_samples: False
+
+    latent_dim: 64
+    latent_steps_min: 10
+    latent_steps_max: 150
+
+    task_reward_w: 0.0
+    disc_reward_w: 0.0
+    conditional_disc_reward_w: 1.0
+    enc_regularization_coeff: 0.1
+
+    # latent matching
+    mode: ORIGINAL_MATCHING # ORIGINAL_MATCHING, SKILL_MATCHING 
+    feature_path: /workspace/CALM/motion_features_locomotion_only_jump.npy #/workspace/CALM/motion_features_locomotion_only_jump.npy' #
+    latent_path: /workspace/CALM/latents_49.npy

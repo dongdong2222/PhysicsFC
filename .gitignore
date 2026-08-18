@@ -1,0 +1,46 @@
+# files
+*.npy
+*.fbx
+*.pyc
+*.cpp
+*.o
+*.so
+*.h
+*.sip
+*.jpg
+*.txt
+*.zip
+*.pth
+*.pkl
+*.json
+*.ipynb
+*.log
+*.wandb
+.DS_Store
+!License.txt
+
+# directories
+/fbxbinding/
+/fbxsdk/
+/fbxpy/
+/output/
+/sip/
+/wandb/
+/runs/
+**/wandb/
+/workspace/CALM/calm/data/motions/
+calm/data/summary/*.npz
+/fbx_sdk/
+
+# large archives
+calm.tar.xz
+calm/data/assets/mjcf/soccer_field (1).blend
+calm/data/assets/mjcf/football_field.png
+
+# Claude Code artifacts
+CLAUDE.md
+.claude/
+plan.md
+clean_plan.md
+readme_plan.md
+research.md
