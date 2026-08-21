@@ -26,8 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-sys.path.append('/workspace/CALM/fbxbinding/build/Distrib/site-packages/fbx/')
+
 
 
 from isaacgym.torch_utils import *

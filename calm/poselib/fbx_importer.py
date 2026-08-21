@@ -37,7 +37,7 @@ from poselib.visualization.common import plot_skeleton_state, plot_skeleton_moti
 
 # source fbx file path
 motion_name = 'AA_Soccer_Player_Waiting01'
-fbx_file = f'blackhole/soccer_mega_pack/{motion_name}.fbx'
+fbx_file = f'datasets/soccer_mega_pack/{motion_name}.fbx'
 
 # import fbx file - make sure to provide a valid joint name for root_joint
 motion = SkeletonMotion.from_fbx(
@@ -47,7 +47,7 @@ motion = SkeletonMotion.from_fbx(
 )
 
 # save motion in npy format
-motion.to_file(f"blackhole/{motion_name}_test.npy")
+motion.to_file(f"datasets/motions/{motion_name}.npy")
 
 # visualize motion
 plot_skeleton_motion_interactive(motion)

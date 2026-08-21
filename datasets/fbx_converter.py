@@ -1,5 +1,3 @@
-import sys
-sys.path.append('/workspace/CALM/fbxbinding/build/Distrib/site-packages/fbx/')
 
 import fbx
 import FbxCommon

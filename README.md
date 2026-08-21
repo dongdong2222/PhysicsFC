@@ -2,7 +2,9 @@
 
 [![PhysicsFC teaser](images/PhysicsFC__SIGGRAPH_2025.gif)](https://youtu.be/OQjIdFQ0g20?si=oeR0Rjspv9ZnEu46)
 
-[Paper (ACM TOG 2025)](https://doi.org/10.1145/3731425)
+ACM TOG / SIGGRAPH 2025
+
+[[project]](https://cgrhyu.github.io/publications/2025-physicsfc.html) [[publisher]](https://dl.acm.org/doi/10.1145/3731425) [[arXiv]](https://arxiv.org/abs/2504.21216) [[Slides(PDF)]](https://gitcgr.hanyang.ac.kr/publications/2025-physicsfc/physicsfc-siggraph-presentation.pdf) [[Slides(PPTX)]](https://gitcgr.hanyang.ac.kr/publications/2025-physicsfc/physicsfc-siggraph-presentation.pptx) [[poster]](https://gitcgr.hanyang.ac.kr/publications/2025-physicsfc/physicsfc-etech-intdis-poster.pdf)
 
 **PhysicsFC** controls physically simulated football players — dribbling, trapping, moving, and
 kicking — from real-time user input via joystick, with smooth, agile transitions between skills
@@ -43,10 +45,8 @@ Adversarial Latent Models, Tessler et al., 2023).
 Separately, two more things you'll need before training/testing:
 
 **Pretrained checkpoints.** Trained model checkpoints (`*.pth`) are not included in this
-repository. Download them via the links in [checkpoints.md](checkpoints.md) and place them
-under `calm/calm_exp/checkpoints/<skill>/`.
-<!-- TODO(open): checkpoints.md currently has no download link for the `move` and `dribble`
-     skills (only `trap` and `kick` do) — add those links before publishing. -->
+repository. Download them from [this Google Drive folder](https://drive.google.com/drive/folders/1iFXCy_skBawjVVPKt8x6fhd3-w1Wb6-w?usp=drive_link)
+and place them under `calm/calm_exp/checkpoints/<skill>/`.
 
 **Motion data.** The football motions used to train PhysicsFC's skills were retargeted from the
 [AA Soccer Mega Animations Pack](https://assetstore.unity.com/packages/3d/animations/aa-soccer-mega-animations-pack-241419)
@@ -57,22 +57,22 @@ under `calm/calm_exp/checkpoints/<skill>/`.
 
 ## Training
 
-PhysicsFC uses a two-level training scheme: a single, shared **low-level controller (LLC)**
-that reproduces football motions from a latent code, and one **high-level controller (HLC)** per
-skill (move / dribble / trap / kick) that outputs latent codes to the frozen LLC to accomplish that
-skill's task.
+PhysicsFC uses a two-level training scheme: a single, shared **low-level policy**
+that reproduces football motions from a latent code, and one **skill policy** per
+skill (move / dribble / trap / kick) that outputs a latent code to the frozen low-level policy to
+accomplish that skill's task.
 
-### Step 1 — Low-Level Controller (LLC) Pre-Training
+### Step 1 — Low-Level Policy Pre-Training
 
-The LLC is trained to imitate the football motion dataset:
+The low-level policy is trained to imitate the football motion dataset:
 ```
 python calm/run.py --task HumanoidAMPGetup --cfg_env calm/data/cfg/humanoid_calm.yaml --cfg_train calm/data/cfg/train/rlg/calm_humanoid.yaml --motion_file blackhole/motions/soccer_90.yaml --num_envs 4096 --headless --track
 ```
-<!-- TODO(open): confirm the exact motion dataset yaml used to pretrain the released LLC checkpoint
+<!-- TODO(open): confirm the exact motion dataset yaml used to pretrain the released low-level policy checkpoint
      — several variants exist under blackhole/motions/ (soccer_90.yaml, soccer_90_with_ground.yaml,
      soccer_90_locomotion*.yaml, ...); soccer_90.yaml is the best evidence found so far
      (hardcoded reference in learning/hrl_players.py) but has not been confirmed as the final one. -->
-- `--motion_file` points to the dataset of football motion clips the LLC should learn to reproduce
+- `--motion_file` points to the dataset of football motion clips the low-level policy should learn to reproduce
   (see [Motion Retargeting](#motion-retargeting) for how these clips are produced). It can be a
   single `.npy` clip or a `.yaml` dataset listing several clips.
 - `--num_envs` is required for an actual training run — `calm/data/cfg/humanoid_calm.yaml`'s
@@ -85,13 +85,13 @@ python calm/run.py --task HumanoidAMPGetup --cfg_env calm/data/cfg/humanoid_calm
   Remove `--headless` to watch the simulation.
 - Checkpoints are saved periodically to `output/`, alongside a Tensorboard log.
 
-### Step 2 — Skill-Specific High-Level Controllers (HLC)
+### Step 2 — Skill-Specific Policies
 
-Each skill's HLC is trained against the frozen LLC checkpoint from Step 1:
+Each skill policy is trained against the frozen low-level policy checkpoint from Step 1:
 ```
 python calm/run.py --task HumanoidMove --cfg_env calm/data/cfg/soccer_hlc/humanoid_move.yaml --cfg_train calm/data/cfg/train/rlg/hrl_humanoid.yaml --llc_checkpoint calm/calm_exp/checkpoints/llc/default.pth --headless --track
 ```
-- `--llc_checkpoint` specifies the pretrained low-level controller from Step 1.
+- `--llc_checkpoint` specifies the pretrained low-level policy from Step 1.
 
 The four skills and their corresponding task/config combinations:
 
@@ -117,9 +117,12 @@ For other skills, swap `--task`, `--cfg_env`, and `--checkpoint` using the table
 the process loads both checkpoints, steps the simulation, and logs a `reward: ... steps: ...` line
 per episode.
 
+- **Requires a joystick/gamepad for movement and skill control** (see `calm/utils/gamepad.py`) —
+  there is no joystick-free way to play.
+
 ### Running the Interactive Demo
 
-The interactive demo combines the LLC and all four skill HLCs into a live, joystick-controlled
+The interactive demo combines the low-level policy and all four skill policies into a live, joystick-controlled
 single-character session:
 ```
 python calm/fifa.py
@@ -144,11 +147,12 @@ before continuing.
 
 1. Split the combined animation pack FBX into per-clip FBX files:
    ```
-   cd blackhole
-   python ../calm/poselib/fbx_converter.py
+   cd datasets
+   python fbx_converter.py
+   cd ..
    ```
-   (expects `AA_Soccer_Mega_Animations_Pack.fbx` in `blackhole/`; writes individual clips to
-   `blackhole/soccer_mega_pack/`.)
+   (expects `AA_Soccer_Mega_Animations_Pack.fbx` in `datasets/`; writes individual clips to
+   `datasets/soccer_mega_pack/`.)
 2. Import each FBX clip into poselib's motion format:
    ```
    python calm/poselib/fbx_importer.py
@@ -157,11 +161,12 @@ before continuing.
    ```
    cd calm/poselib
    python retarget_motion.py
+   cd ../..
    ```
    `retarget_motion.py` loads its configuration from `data/configs/retarget.json` — edit it to
    match the motion data you want to retarget, then re-run the script. 
 4. Group the retargeted `.npy` clips into a dataset `.yaml` file (a list of `{file, weight}`
-   entries) using `calm/poselib/data_config.ipynb` 
+   entries) using `datasets/motions/data_config.ipynb`
 
 To visualize a single motion clip or a dataset:
 ```
