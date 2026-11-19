@@ -130,10 +130,22 @@ python calm/fifa.py
 - **Requires a joystick/gamepad for movement and skill control** (see `calm/utils/gamepad.py`) —
   there is no joystick-free way to play. The keyboard is only used for `SPACE` (restart) and
   `ESC` (quit), not for controlling the player.
-- Loads checkpoints directly from `calm/calm_exp/checkpoints/{llc,move,dribble,trap,kick}/`
-  (hardcoded paths). The controlled player starts each round in a trap scenario — a ball is
+- Loads checkpoints from `calm/calm_exp/checkpoints/{llc,move,dribble,trap,kick}/` by default. The controlled player starts each round in a trap scenario — a ball is
   launched toward them — and can chain into dribbling and kicking via the joystick; `SPACE`
   restarts with a new trap scenario.
+- Other checkpoints can be passed with `--llc_checkpoint`, `--move_checkpoint`, `--dribble_checkpoint`,
+  `--trap_checkpoint` and `--kick_checkpoint`. Each skill's version (original or `*_Fix`) is detected from the
+  checkpoint's observation size (dribble 14 / 12, kick 10 / 13, trap 15 / 17, or 20 with `POST_TARGET_VEL`).
+  The Fix skills were trained with a different ball, so add `--ball_profile linear_damping_and_mjfriction`:
+  ```
+  python calm/fifa.py --ball_profile linear_damping_and_mjfriction \
+      --dribble_checkpoint output/<dribble_fix_run>/nn/<run>.pth \
+      --kick_checkpoint output/<kick_fix_run>/nn/<run>.pth \
+      --trap_checkpoint output/<trap_fix_run>/nn/<run>.pth
+  ```
+  With a Fix kick, the kick and pass target ranges come from `humanoid_kick_fix.yaml`. A ground pass then aims at
+  elevation 0. With a trap that uses `POST_TARGET_VEL`, the post-trap target ball velocity follows the left stick,
+  with the maximum speed from `POST_TAR_SPEED_MAX`.
 
 &nbsp;
 

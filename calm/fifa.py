@@ -21,6 +21,7 @@ torch.manual_seed(42)
 from utils.config import parse_sim_params
 from utils import torch_utils
 from utils import gamepad
+from env.tasks.soccer_hlc.ball_physics import load_ball_profile, create_ball_asset, MujocoFriction
 
 import yaml
 import numpy as np
@@ -236,9 +237,24 @@ class DynamicSwitchingEnv(FootballSkillMapper):
         # Build Gym & Sim
         self.gym = gymapi.acquire_gym()
         # parse arguments
-        args = gymutil.parse_arguments(description="Body Physics Properties Example")
+        # 체크포인트 경로 (비우면 calm/calm_exp/checkpoints/<skill>/ 의 기본 파일). 스킬 버전 (원본 / Fix) 은 체크포인트 관측 크기로 판단
+        # --ball_profile: calm/data/cfg/soccer_hlc/ball/<name>.yaml 로 공 + 바닥 설정 (Fix 스킬은 linear_damping_and_mjfriction 으로 학습). 비우면 기존 데모 공
+        args = gymutil.parse_arguments(description="Body Physics Properties Example", custom_parameters=[
+            {"name": "--llc_checkpoint", "type": str, "default": ""},
+            {"name": "--move_checkpoint", "type": str, "default": ""},
+            {"name": "--dribble_checkpoint", "type": str, "default": ""},
+            {"name": "--trap_checkpoint", "type": str, "default": ""},
+            {"name": "--kick_checkpoint", "type": str, "default": ""},
+            {"name": "--ball_profile", "type": str, "default": ""},
+        ])
         with open(os.path.join(os.getcwd(), "calm/calm_exp/cfg/env.yaml"), 'r') as f:
             self.cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        self.ball_profile = load_ball_profile(args.ball_profile) if args.ball_profile else None
+        if self.ball_profile is not None:
+            ground = self.ball_profile["ground"]
+            self.cfg["env"]["plane"] = {"staticFriction": ground["static_friction"],
+                                        "dynamicFriction": ground["dynamic_friction"],
+                                        "restitution": ground["restitution"]}
 
         sim_params = parse_sim_params(args, self.cfg, None)
         self.sim = self.gym.create_sim(args.compute_device_id, args.graphics_device_id, args.physics_engine, sim_params)
@@ -266,7 +282,7 @@ class DynamicSwitchingEnv(FootballSkillMapper):
         humanoid_asset_root = os.path.dirname(humanoid_asset_path)
         humanoid_asset_file_name = os.path.basename(humanoid_asset_path)
         humanoid_asset_options = gymapi.AssetOptions()
-        humanoid_asset_options.angular_damping = 0.5
+        humanoid_asset_options.angular_damping = 0.01  # 학습 (humanoid.py) 과 같은 값
         humanoid_asset_options.linear_damping = 0.0
         humanoid_asset_options.max_angular_velocity = 100.0
         humanoid_asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
@@ -284,27 +300,30 @@ class DynamicSwitchingEnv(FootballSkillMapper):
         self.gym.set_asset_rigid_shape_properties(humanoid_asset, humanoid_shape_properties)
 
         # Load Ball Asset & Configure
-        ball_asset_root = "calm/data/assets/mjcf/"
-        ball_asset_file_name = "soccer_ball.urdf"
-        ball_asset_options = gymapi.AssetOptions()
-        ball_asset_options.angular_damping = .05
-        ball_asset_options.linear_damping = .1
-        ball_asset_options.max_angular_velocity = 100.0
-        ball_asset_options.override_inertia = True
-        ball_asset_options.density = 80.71
-        ball_asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+        if self.ball_profile is not None:
+            ball_asset = create_ball_asset(self.gym, self.sim, self.ball_profile["ball"])
+        else:
+            ball_asset_root = "calm/data/assets/mjcf/"
+            ball_asset_file_name = "soccer_ball.urdf"
+            ball_asset_options = gymapi.AssetOptions()
+            ball_asset_options.angular_damping = .05
+            ball_asset_options.linear_damping = .1
+            ball_asset_options.max_angular_velocity = 100.0
+            ball_asset_options.override_inertia = True
+            ball_asset_options.density = 80.71
+            ball_asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
 
-        ball_asset = self.gym.load_asset(
-            self.sim,
-            ball_asset_root,
-            ball_asset_file_name,
-            ball_asset_options
-        )
-        ball_shape_property = self.gym.get_asset_rigid_shape_properties(ball_asset)
-        ball_shape_property[0].restitution = 0.8
-        ball_shape_property[0].friction = .2
-        ball_shape_property[0].rolling_friction = .2
-        self.gym.set_asset_rigid_shape_properties(ball_asset, ball_shape_property)
+            ball_asset = self.gym.load_asset(
+                self.sim,
+                ball_asset_root,
+                ball_asset_file_name,
+                ball_asset_options
+            )
+            ball_shape_property = self.gym.get_asset_rigid_shape_properties(ball_asset)
+            ball_shape_property[0].restitution = 0.8
+            ball_shape_property[0].friction = .2
+            ball_shape_property[0].rolling_friction = .2
+            self.gym.set_asset_rigid_shape_properties(ball_asset, ball_shape_property)
 
         heading_marker_col_filter = ~( 0b100 << self.num_character )
         ball_col_filter = 0b01
@@ -625,7 +644,59 @@ class DynamicSwitchingEnv(FootballSkillMapper):
             self.kick_success = torch.zeros(self.num_character, dtype=torch.bool, device=self.device)
             
 
-        self.controller_network = ControllerNetwork(batch_size=self.num_character, device=self.device)
+        # MuJoCo 식 공-바닥 구름 / 비틀림 마찰 (BallPhysicsMixin 과 같게 simulate() 마다 적용)
+        self.ball_friction = None
+        if self.ball_profile is not None and self.ball_profile.get("mj_friction") is not None:
+            mj = self.ball_profile["mj_friction"]
+            ball_handle = self.dict_global_actor_handle["ball"]
+            ball_body_prop = self.gym.get_actor_rigid_body_properties(self.env, ball_handle)[0]
+            self.ball_friction = MujocoFriction(
+                self.gym, self.sim, [self.dict_global_actor_idx["ball"]],
+                [self.gym.get_actor_rigid_body_index(self.env, ball_handle, 0, gymapi.DOMAIN_SIM)],
+                [mj["torsional"]], [mj["rolling"]], [ball_body_prop.inertia.x.x], [ball_body_prop.mass],
+                [self.ball_profile["ball"]["radius"]], self.sim_params.dt)
+
+        checkpoint_path_dict = {
+            key: os.path.abspath(path) for key, path in (
+                ("llc", args.llc_checkpoint), ("move", args.move_checkpoint), ("dribble", args.dribble_checkpoint),
+                ("trap", args.trap_checkpoint), ("kick", args.kick_checkpoint)) if path
+        }
+        self.controller_network = ControllerNetwork(batch_size=self.num_character, device=self.device, checkpoint_path_dict=checkpoint_path_dict)
+
+        # 스킬 버전: task obs 크기로 구분 (dribble 14 원본 / 12 Fix, kick 10 / 13, trap 15 / 17 Fix / 20 Fix + POST_TARGET_VEL)
+        self.task_obs_size = {
+            skill_key: self.controller_network.hlc_num_obs_dict[skill_key] - self.controller_network.num_humanoid_obs
+                for _, skill_key in self.enum_skill
+        }
+        known_sizes = {"move": (5,), "dribble": (14, 12), "kick": (10, 13), "trap": (15, 17, 20)}
+        for skill_key, size in self.task_obs_size.items():
+            assert size in known_sizes[skill_key], f"unknown {skill_key} checkpoint (task obs {size})"
+        print(f"task obs size: {self.task_obs_size}")
+        fix_skills = [skill_key for skill_key, size in self.task_obs_size.items() if size != known_sizes[skill_key][0]]
+        if fix_skills and self.ball_profile is None:
+            print(f"WARNING: Fix skills {fix_skills} were trained with --ball_profile linear_damping_and_mjfriction")
+
+        # 패스 / 킥 목표 범위. Fix kick 은 humanoid_kick_fix.yaml 의 학습 범위 (뜬 공 고각 하한, 땅볼 = 고각 0)
+        self.lob_pass_angle_min = 20.0
+        self.lob_pass_angle_max = 45.0
+        self.ground_pass_dir_z = 0.05
+        self.ground_pass_speed_max = 20.0
+        if self.task_obs_size["kick"] == 13:
+            with open(os.path.join(os.getcwd(), "calm/data/cfg/soccer_hlc/humanoid_kick_fix.yaml"), 'r') as f:
+                kick_cfg = yaml.load(f, Loader=yaml.SafeLoader)["env"]
+            self.min_target_kick_speed = min(kick_cfg["TAR_SPEED_MIN"], kick_cfg["GROUND_SPEED_MIN"])
+            self.max_target_kick_speed = max(kick_cfg["TAR_SPEED_MAX"], kick_cfg["GROUND_SPEED_MAX"])
+            self.min_target_kick_angle = np.deg2rad(kick_cfg["TAR_ELEV_MIN"])
+            self.max_target_kick_angle = np.deg2rad(kick_cfg["TAR_ELEV_MAX"])
+            self.lob_pass_angle_min = kick_cfg["TAR_ELEV_MIN"]
+            self.lob_pass_angle_max = kick_cfg["TAR_ELEV_MAX"]
+            self.ground_pass_dir_z = 0.0
+            self.ground_pass_speed_max = kick_cfg["GROUND_SPEED_MAX"]
+        # Fix trap + POST_TARGET_VEL: 트래핑 후 목표 공 속력 상한 (왼쪽 스틱 크기에 비례)
+        self.max_target_post_trap_speed = 0.0
+        if self.task_obs_size["trap"] == 20:
+            with open(os.path.join(os.getcwd(), "calm/data/cfg/soccer_hlc/humanoid_trap_fix.yaml"), 'r') as f:
+                self.max_target_post_trap_speed = yaml.load(f, Loader=yaml.SafeLoader)["env"]["POST_TAR_SPEED_MAX"]
 
         # Target tensors
         self.target_move_speed = None
@@ -647,12 +718,8 @@ class DynamicSwitchingEnv(FootballSkillMapper):
 
         self.setup_target_tensors()
 
-        self.task_obs = torch.zeros_like(compute_move_observations(
-            root_states=self.state_root_humanoid,
-            target_dir=self.target_move_dir,
-            target_speed=self.target_move_speed,
-            target_face_dir=self.target_facing_dir
-        ))
+        # 각 스킬 HLC 는 앞에서부터 자기 obs 크기만큼 잘라 쓴다 (원본 스킬 obs 는 18 로 패딩)
+        self.task_obs = torch.zeros(self.num_character, max(18, *self.task_obs_size.values()), device=self.device)
 
     def setup_target_tensors(self) -> None:
         self.target_move_speed = 0.0 * self.max_target_move_speed * torch.ones([self.num_character], device=self.device, dtype=torch.float32)
@@ -677,6 +744,10 @@ class DynamicSwitchingEnv(FootballSkillMapper):
         self.target_onehot[..., -3::2] = torch.nn.functional.one_hot(torch.randint(0, 2, (self.num_character,), device=self.device), num_classes=2) 
 
         self.target_ball_fall_pos = self.state_root_humanoid[..., 0:3].clone()
+
+        self.target_post_trap_speed = torch.zeros([self.num_character], device=self.device, dtype=torch.float32)
+        self.target_post_trap_dir = torch.zeros([self.num_character, 2], device=self.device, dtype=torch.float32)
+        self.target_post_trap_dir[..., 0] = 1.0
 
     def register_keyboard_event(self):
         self.gym.subscribe_viewer_keyboard_event(
@@ -764,15 +835,25 @@ class DynamicSwitchingEnv(FootballSkillMapper):
             root_height_obs=True
         )
         for skill_id, skill_key in self.enum_skill:
+            skill_mask = target_skill_id==skill_id
             if skill_key == "move":
-                self.task_obs[target_skill_id==skill_id] = compute_move_observations(
+                obs = compute_move_observations(
                     root_states=state_root_humanoid,
                     target_dir=target_move_dir,
                     target_speed=target_move_speed,
                     target_face_dir=self.target_facing_dir
-                )[target_skill_id==skill_id]
+                )
+            elif skill_key == "dribble" and self.task_obs_size["dribble"] == 12:
+                obs = compute_dribble_fix_observations(
+                    root_states=state_root_humanoid,
+                    target_dir=target_dribble_dir,
+                    target_speed=target_dribble_speed,
+                    ball_pos=state_ball_pos,
+                    ball_vel=state_ball_linvel,
+                    ball_ang_vel=state_ball_angvel
+                )
             elif skill_key == "dribble":
-                self.task_obs[target_skill_id==skill_id] = compute_dribble_observations(
+                obs = compute_dribble_observations(
                     root_states=state_root_humanoid,
                     target_dir=target_dribble_dir,
                     target_speed=target_dribble_speed,
@@ -780,15 +861,29 @@ class DynamicSwitchingEnv(FootballSkillMapper):
                     ball_pos=state_ball_pos,
                     ball_vel=state_ball_linvel,
                     ball_ang_vel=state_ball_angvel
-                )[target_skill_id==skill_id]
-            elif skill_key == "trap":
-                self.task_obs[target_skill_id==skill_id] = compute_heading_observations_simple_onehot(
+                )
+            elif skill_key == "trap" and self.task_obs_size["trap"] != 15:
+                obs = compute_trap_fix_observations(
                     root_states=state_root_humanoid,
                     ball_pos=state_ball_pos,
                     ball_vel=state_ball_linvel,
                     ball_ang_vel=state_ball_angvel,
                     onehot_body_part=target_onehot
-                )[target_skill_id==skill_id]
+                )
+                if self.task_obs_size["trap"] == 20:
+                    obs = torch.cat([obs, compute_post_trap_target_observations(
+                        root_states=state_root_humanoid,
+                        target_dir=self.target_post_trap_dir,
+                        target_speed=self.target_post_trap_speed
+                    )], dim=-1)
+            elif skill_key == "trap":
+                obs = compute_heading_observations_simple_onehot(
+                    root_states=state_root_humanoid,
+                    ball_pos=state_ball_pos,
+                    ball_vel=state_ball_linvel,
+                    ball_ang_vel=state_ball_angvel,
+                    onehot_body_part=target_onehot
+                )
                 # self.task_obs[target_skill_id==skill_id] = compute_heading_observations_simple_target_fall_onehot(
                 #     root_states=state_root_humanoid,
                 #     ball_pos=state_ball_pos,
@@ -797,16 +892,25 @@ class DynamicSwitchingEnv(FootballSkillMapper):
                 #     target_fall_pos=target_ball_fall_pos,
                 #     onehot_body_part=target_onehot
                 # )[target_skill_id==skill_id]
-            elif skill_key == "kick":
-                self.task_obs[target_skill_id==skill_id] = compute_kick_observations(
+            elif skill_key == "kick" and self.task_obs_size["kick"] == 13:
+                obs = compute_kick_fix_observations(
                     root_states=state_root_humanoid,
                     ball_states=state_ball_expanded,
                     target_speed=target_kick_speed,
                     target_dir=target_kick_dir
-                )[target_skill_id==skill_id]
+                )
+            elif skill_key == "kick":
+                obs = compute_kick_observations(
+                    root_states=state_root_humanoid,
+                    ball_states=state_ball_expanded,
+                    target_speed=target_kick_speed,
+                    target_dir=target_kick_dir
+                )
             else:
                 print(f"ERROR! Unknown Skill Name: {skill_key}")
                 quit()
+            obs = torch.nn.functional.pad(obs, (0, self.task_obs.shape[-1]-obs.shape[-1], 0, 0), mode='constant', value=0)
+            self.task_obs[skill_mask] = obs[skill_mask]
         return torch.cat([humanoid_obs, self.task_obs.view(self.num_character, -1)], dim=-1)
 
     def _reset_ball_for_trap(self):
@@ -1101,11 +1205,11 @@ class DynamicSwitchingEnv(FootballSkillMapper):
                     pass_target_idx = 8 if self.my_character_idx == 0 else 0
                 self.target_kick_dir[self.my_character_idx], self.target_kick_speed[self.my_character_idx] = self.compute_kick_targets(
                     pass_target_idx=pass_target_idx, 
-                    angle=torch.deg2rad(torch.clamp(45. * torch.norm(tensor_l_stick), min=20, max=45))
+                    angle=torch.deg2rad(torch.clamp(45. * torch.norm(tensor_l_stick), min=self.lob_pass_angle_min, max=self.lob_pass_angle_max))
                 )
                 if self.is_ground_passing:
-                    self.target_kick_dir[self.my_character_idx, 2] = 0.05
-                    self.target_kick_speed[self.my_character_idx] = torch.clamp(self.target_kick_speed[self.my_character_idx], max=20.0)
+                    self.target_kick_dir[self.my_character_idx, 2] = self.ground_pass_dir_z
+                    self.target_kick_speed[self.my_character_idx] = torch.clamp(self.target_kick_speed[self.my_character_idx], max=self.ground_pass_speed_max)
                 self.is_passing_to = pass_target_idx
             
             if self.is_kickking:                           # KICK
@@ -1135,10 +1239,16 @@ class DynamicSwitchingEnv(FootballSkillMapper):
         self.target_dribble_dir[self.my_character_idx] = tensor_l_stick.clone()
         self.target_dribble_speed[self.my_character_idx] = (self.max_target_dribble_speed - self.min_target_dribble_speed) * torch.clamp(torch.norm(tensor_l_stick), 0.0, 1.0) + self.min_target_dribble_speed
 
+        # 트래핑 후 목표 공 속도 (Fix trap + POST_TARGET_VEL): 왼쪽 스틱 방향, 속력은 스틱 크기에 비례. 스틱이 작으면 방향은 이전 값 유지
+        if torch.norm(tensor_l_stick) >= self.threshold_override_r_stick:
+            self.target_post_trap_dir[self.my_character_idx] = torch.nn.functional.normalize(tensor_l_stick, dim=-1)
+        self.target_post_trap_speed[self.my_character_idx] = self.max_target_post_trap_speed * torch.clamp(torch.norm(tensor_l_stick), 0.0, 1.0)
+
         # normalization
         self.target_ball_fall_pos[:] = self.state_humanoid_body[:, 11, 0:3]
         self.target_ball_fall_pos[..., 0:2] += torch.nn.functional.normalize(tensor_l_stick, dim=-1) * torch.clamp(torch.norm(tensor_l_stick), 0.0, 1.0) * 0.5
         self.target_move_dir = torch.nn.functional.normalize(self.target_move_dir, dim=-1)
+        self.target_dribble_dir = torch.nn.functional.normalize(self.target_dribble_dir, dim=-1)
         self.target_facing_dir = torch.nn.functional.normalize(self.target_facing_dir, dim=-1)
         self.target_kick_dir = torch.nn.functional.normalize(self.target_kick_dir, dim=-1)
         self.target_move_speed = torch.clamp(self.target_move_speed, min=self.min_target_move_speed, max=self.max_target_move_speed)
@@ -1390,7 +1500,9 @@ class DynamicSwitchingEnv(FootballSkillMapper):
                 self.update_dof_state()
 
                 render_freq_counter += 1
-                
+
+                if self.ball_friction is not None:
+                    self.ball_friction.apply(self.state_root)
                 self.gym.simulate(self.sim)
                 self.gym.fetch_results(self.sim, True)
 

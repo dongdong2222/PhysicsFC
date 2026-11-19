@@ -193,6 +193,64 @@ def compute_heading_observations_simple_onehot(root_states, ball_pos, ball_vel, 
     obs = torch.nn.functional.pad(obs, (0, 18-15, 0, 0), mode='constant', value=0)
     return obs
 
+# Fix 스킬 (HumanoidDribble_Fix / HumanoidKick_Fix / HumanoidTrap_Fix) 관측. 학습 태스크의 _compute_task_obs 와 같은 순서, 패딩 없음
+def compute_dribble_fix_observations(root_states, target_dir, target_speed, ball_pos, ball_vel, ball_ang_vel):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    # 원본 dribble 에서 target_face_dir 제외 (14 -> 12)
+    root_pos = root_states[:, :3]
+    root_rot = root_states[:, 3:7]
+    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+
+    target_dir3d = torch.cat([target_dir[..., 0:2], torch.zeros_like(target_dir[..., 0:1])], dim=-1)
+    local_target_dir = quat_rotate(heading_rot, target_dir3d)[..., 0:2]
+
+    local_ball_pos = ball_pos - root_pos
+    local_ball_pos[..., -1] = ball_pos[..., -1]
+    local_ball_pos = quat_rotate(heading_rot, local_ball_pos)
+    local_ball_vel = quat_rotate(heading_rot, ball_vel)
+    local_ball_ang_vel = quat_rotate(heading_rot, ball_ang_vel)
+
+    return torch.cat([local_target_dir, target_speed.unsqueeze(-1), local_ball_pos, local_ball_vel, local_ball_ang_vel], dim=-1)
+
+def compute_kick_fix_observations(root_states, ball_states, target_speed, target_dir):
+    # type: (Tensor, Tensor, Tensor, Tensor) -> Tensor
+    # 원본 kick + 공 각속도 (10 -> 13), 순서: 공 위치, 공 속도, 공 각속도, 목표 속력, 목표 방향
+    root_pos = root_states[:, 0:3]
+    root_rot = root_states[:, 3:7]
+    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+
+    local_ball_pos = ball_states[:, 0:3] - root_pos
+    local_ball_pos[..., -1] = ball_states[:, 2]
+    local_ball_pos = quat_rotate(heading_rot, local_ball_pos)
+    local_ball_vel = quat_rotate(heading_rot, ball_states[:, 7:10])
+    local_ball_ang_vel = quat_rotate(heading_rot, ball_states[:, 10:13])
+    local_target_dir = quat_rotate(heading_rot, target_dir)
+    return torch.cat([local_ball_pos, local_ball_vel, local_ball_ang_vel, target_speed.unsqueeze(-1), local_target_dir], dim=-1)
+
+def compute_trap_fix_observations(root_states, ball_pos, ball_vel, ball_ang_vel, onehot_body_part):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    # 원본 simple_onehot, one-hot 6 -> 8 (허벅지 2 개는 0)
+    root_pos = root_states[:, :3]
+    root_rot = root_states[:, 3:7]
+    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+
+    local_ball_pos = ball_pos - root_pos
+    local_ball_pos[..., -1] = ball_pos[..., -1]
+    local_ball_pos = quat_rotate(heading_rot, local_ball_pos)
+    local_ball_vel = quat_rotate(heading_rot, ball_vel)
+    local_ball_ang_vel = quat_rotate(heading_rot, ball_ang_vel)
+
+    onehot_body_part = torch.nn.functional.pad(onehot_body_part, (0, 8-onehot_body_part.shape[-1], 0, 0), mode='constant', value=0)
+    return torch.cat([local_ball_pos, local_ball_vel, local_ball_ang_vel, onehot_body_part], dim=-1)
+
+def compute_post_trap_target_observations(root_states, target_dir, target_speed):
+    # type: (Tensor, Tensor, Tensor) -> Tensor
+    # HumanoidTrap_Fix POST_TARGET_VEL: 트래핑 후 목표 공 방향 (heading 기준 xy) + 목표 속력
+    heading_rot = torch_utils.calc_heading_quat_inv(root_states[:, 3:7])
+    target_dir3d = torch.cat([target_dir[..., 0:2], torch.zeros_like(target_dir[..., 0:1])], dim=-1)
+    local_target_dir = quat_rotate(heading_rot, target_dir3d)[..., 0:2]
+    return torch.cat([local_target_dir, target_speed.unsqueeze(-1)], dim=-1)
+
 
 
 class DoubleKeyDict(dict):
