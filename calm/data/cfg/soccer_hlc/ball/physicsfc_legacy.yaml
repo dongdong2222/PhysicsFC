@@ -1,0 +1,19 @@
+# Ball/ground used by HumanoidDribble before ball profiles existed (checkpoints up to 2026-10-28;
+# density 80.71 was added on 2026-10-28, before that the URDF default 1000 -> 5.575 kg).
+# rolling_friction 0.5 of the old code is left out: PhysX ignores it.
+ball:
+  radius: 0.11                  # soccer_ball.urdf collision sphere
+  density: 80.71                # 0.45 kg
+  inertia_ratio: null           # null = solid sphere from the density (0.4 m r^2)
+  linear_damping: 0.1
+  angular_damping: 0.05
+  max_angular_velocity: 100.0
+  friction: 0.2
+  restitution: 0.8
+
+ground:
+  static_friction: 1.0
+  dynamic_friction: 1.0
+  restitution: 0.2
+
+mj_friction: null               # off

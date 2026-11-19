@@ -1,0 +1,24 @@
+# Closest to a real match ball on turf (same as "real_soccer" in ball_fifa_test_vis.py, except the ground):
+#   FIFA size 5 ball (r 0.11 m, 0.43 kg = density 77.1), hollow shell inertia I = 2/3 m r^2,
+#   restitution 0.88 -> ~1.43 m on the steel plate (FIFA Quality Pro ball 1.35~1.55 m),
+#   sliding friction pair (0.2 + 1.0) / 2 = 0.6 (ball on grass ~0.4~0.6),
+#   linear_damping 0.1 as air drag, no angular_damping (MuJoCo friction does the slowing on the ground),
+#   max_angular_velocity 300 (rolls without slip up to ~33 m/s).
+# Ground restitution stays 0.2 instead of the turf's 0.35 because the humanoid shares the ground
+# (ball-ground pair 0.54 instead of 0.615, so turf rebounds come out a bit low).
+ball:
+  radius: 0.11
+  density: 80.71
+  inertia_ratio: null
+  linear_damping: 0.15
+  angular_damping: 1.625
+  max_angular_velocity: 300.0
+  friction: 0.2
+  restitution: 0.8
+
+ground:
+  static_friction: 1.0
+  dynamic_friction: 1.0
+  restitution: 0.2
+
+mj_friction: null
