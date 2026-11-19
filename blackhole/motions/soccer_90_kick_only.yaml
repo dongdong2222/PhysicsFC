@@ -1,0 +1,15 @@
+motions:
+- file: AA_Soccer_Player_GShoot_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FShoot_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_GShoot_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FShoot_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_Kick-off_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FreeKick01_RF_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FreeKick01_LF_calm.npy
+  weight: 0.2

@@ -1,0 +1,86 @@
+# HumanoidDribbleFace 전용 env cfg. humanoid_dribble_fix.yaml 복사본이며 차이는 아래.
+#   relocate_dist: 3.0 -> 5.0, tarSpeedMax: 5 -> 3
+#   reward: ball 과 face 를 곱으로 묶음 BALL_FACE_REWARD_W * ball * (FACE_FLOOR + (1 - FACE_FLOOR) * face)
+#     BALL_REWARD_W 는 1.0 (곱하기 전 ball 값을 받기 위함), HUMANOID/DIST 0.2/0.2 -> 0.2/0.1
+#   FACE_ERR_SCALE (face reward 의 exp(-k |θ|/π) 의 k), DIST_ERR_SCALE (dist reward 의 exp(-k d) 의 k) 추가
+#   headingChangeSteps* / enableRandHeading 은 쓰지 않는다 (target 은 리셋 때만 정함)
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 5
+  episodeLength: 300
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Default"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  numAMPEncObsSteps: 60
+  
+  localRootObs: True
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot"]
+  terminationHeight: 0.15
+  enableEarlyTermination: False
+
+  # hyper parameters
+  INIT_BALL_DIST: 0.5            # 공 스폰 환형의 바깥 반경
+  INIT_BALL_DIST_MIN: 0.3        # 안쪽 반경. 이보다 가까우면 공이 몸 안에 생겨 리셋 때 튄다
+  INIT_BALL_Z: 0.12
+  BALL_REWARD_W: 1.0            # 가중치는 BALL_FACE_REWARD_W 로 준다
+  HUMANOID_REWARD_W: 0.2
+  DIST_REWARD_W: 0.1
+  DIST_FRONT_OFFSET: 0.0        # dist reward 기준점 = root + 이 값 * heading 방향 [m]. 0 = root (기존과 같음)
+  BALL_FACE_REWARD_W: 0.7
+  FACE_FLOOR: 0.0               # α. face 가 0 이어도 ball 의 α 배는 받음 (0 = 순수 곱)
+  FACE_ERR_SCALE: 4.0
+  DIST_ERR_SCALE: 4.0
+  IS_INIT_BY_FILE: False
+  
+  tarSpeedMin: .5
+  tarSpeedMax: 3
+  headingChangeStepsMin: 100
+  headingChangeStepsMax: 200
+  enableRandHeading: True
+  enableTaskObs: True
+  relocate_dist: 5.0
+  
+  asset:
+    assetRoot: "calm/data/assets"
+    assetFileName: "mjcf/amp_humanoid_shoe.xml"
+
+  # ball + ground (plane) physics: calm/data/cfg/soccer_hlc/ball/<ballProfile>.yaml
+  # (dribble_legacy = settings of the checkpoints trained before 2026-10-29)
+  ballProfile: dribble_legacy
+  ballOverrides: {}
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 2.0   # Ball Mastery 실측: 처리량 동일, GPU 메모리 피크 감소
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
+
+
+evaluation:
+  task: "dribble"
+  change_steps: 150 # after change_steps change to next testcase. 30 step is 1 sec for default.
+  batch_num: 100
+  batch_size: 30
+  gain_criteria_frame: 10
+  criteria_angle: 10 #degree
+  criteria_speed: 0.5 #m/s
+  criteria_speed: 0.5 #m

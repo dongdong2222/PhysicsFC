@@ -1,0 +1,93 @@
+# HumanoidBallMastery: 무작위 방향에서 오는 공을 원터치로 목표 방향/속력으로 보내기.
+# humanoid_dribble.yaml 을 바탕으로 했고, 아래 주석이 붙은 항목이 이 task 전용이다.
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 5
+  episodeLength: 45             # 1.5 s @ 30 Hz
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Default"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  numAMPEncObsSteps: 60
+  
+  localRootObs: True
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot"]
+  terminationHeight: 0.15
+  enableEarlyTermination: False  # 넘어짐 판정만 제어. 터치 종료/공 이탈은 이 플래그와 무관하게 항상 켜져 있다
+
+  # hyper parameters
+  INIT_BALL_DIST: 0.5            # 공 스폰 환형의 바깥 반경
+  INIT_BALL_DIST_MIN: 0.3        # 안쪽 반경. 이보다 가까우면 공이 몸 안에 생겨 리셋 때 튄다
+  INIT_BALL_Z: 0.12
+  BALL_REWARD_W: 0.6             # 상속한 HumanoidDribble.__init__ 이 읽지만 이 task 의 보상에는 쓰이지 않는다
+  HUMANOID_REWARD_W: 0.2         # 〃
+  DIST_REWARD_W: 0.2             # 〃
+  IS_INIT_BY_FILE: False
+  
+  tarSpeedMin: .1
+  tarSpeedMax: 2
+  headingChangeStepsMin: 1000    # episodeLength 보다 커서 목표가 에피소드 내내 고정된다
+  headingChangeStepsMax: 1001
+  enableRandHeading: True
+  enableTaskObs: True
+  relocate_dist: 3.0             # 공이 이만큼 멀어지면 종료
+
+  # reward
+  distRewardW: 0.5               # 터치 전. 접촉 중과 같은 개선량 형태라 합이 1 이하로 묶인다
+  contactRewardW: 0.5            # 접촉 중. q 의 개선량이라 접촉 길이와 무관하게 합이 1 이하로 묶인다
+  touchRewardW: 1.0              # 터치 끝 (가중치 최대)
+  velErrScale: 5               # exp(-velErrScale * (par_w * e_par^2 + tan_w * e_tan^2))
+  velErrParW: 0.5                # 목표 방향 성분 오차
+  velErrTanW: 1.0                # 수직 성분 오차. 드리블 원본 가중치는 (par .1 / tan 1) 로 반대다
+  faceShapeW: 0.5                # facing 개선량 (터치 전)
+  faceTouchW: 0.5                # facing 종료 보상 (터치 끝)
+  tarFacingRangeDeg: 90          # tar_dir 기준 +-이 각도 안에서 facing 목표를 뽑는다
+  touchEvalMode: rolling         # rolling = 구름 전이 후 속도 / instant = 터치 끝 순간의 속도. 8.7절 측정 참고
+
+  # 초기 상태 버퍼: 좋은 터치로 끝난 에피소드의 마지막 상태 (캐릭터 + 공)
+  initBufferSize: 65536
+  initBufferDribbleRatio: 0.1    # 이 비율만큼은 항상 드리블식 스폰
+  initBufferTouchRewardMin: 0.5  # 터치 품질(가중치 적용 전)이 이보다 커야 저장
+
+  # 공-휴머노이드 접촉 판정 (force / 캡슐 거리 / xy 속도 변화 의 AND)
+  ball_contact_force_threshold: 4.412
+  ball_contact_capsule_distance_threshold: 0.1
+  ball_contact_velocity_change_threshold: 0.0   # 0 이면 속도 조건은 항상 통과
+  ball_contact_capsule_body_names: ["pelvis", "torso", "head",
+    "right_upper_arm", "right_lower_arm", "right_hand",
+    "left_upper_arm", "left_lower_arm", "left_hand",
+    "right_thigh", "right_shin", "right_foot",
+    "left_thigh", "left_shin", "left_foot"]
+
+  asset:
+    assetRoot: "calm/data/assets"
+    assetFileName: "mjcf/amp_humanoid_shoe.xml"
+
+  # ball + ground (plane) physics: calm/data/cfg/soccer_hlc/ball/<ballProfile>.yaml
+  ballProfile: only_mjfriction
+  ballOverrides: {}
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 2.0   # 8 GB 카드에서 4096 env 피크 7.73 GB -> 7.36 GB.
+                                          # 처리량은 동일 (36.2k -> 36.5k fps)
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

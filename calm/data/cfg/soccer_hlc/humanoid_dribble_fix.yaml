@@ -1,0 +1,87 @@
+# HumanoidDribble_Fix 전용 env cfg. humanoid_dribble.yaml 복사본이며 차이는 아래 한 가지.
+#   relocate_dist: 2.0 -> 3.0  (공이 캐릭터에서 3m 넘게 멀어지면 early termination)
+# 원본 HumanoidDribble 은 relocate_dist 를 쓰지 않으므로 그쪽 cfg 는 건드리지 않았다.
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 5
+  episodeLength: 300
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Default"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  numAMPEncObsSteps: 60
+  
+  localRootObs: True
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot"]
+  terminationHeight: 0.15
+  enableEarlyTermination: False
+
+  # hyper parameters
+  INIT_BALL_DIST: 0.5            # 공 스폰 환형의 바깥 반경
+  INIT_BALL_DIST_MIN: 0.3        # 안쪽 반경. 이보다 가까우면 공이 몸 안에 생겨 리셋 때 튄다
+  INIT_BALL_Z: 0.12
+  BALL_REWARD_W: 0.6
+  HUMANOID_REWARD_W: 0.2
+  DIST_REWARD_W: 0.2
+  DIST_FRONT_OFFSET: 0        # dist reward 기준점 = root + 이 값 * heading 방향 [m]. 0 = root (기존과 같음)
+  IS_INIT_BY_FILE: False         # 원본 경로 (깨져 있음). 아래 INIT_FILE_PROB 를 쓴다
+  INIT_FILE_PROB: 0.8          # 리셋 때 INIT_FILES 상태에서 시작할 확률 (나머지는 기본 리셋: 기본 자세, 공 0.3-0.5 m 정지). 0 이면 파일을 읽지 않음
+  INIT_FILES:                    # 합쳐서 균등 샘플 (파일 크기 비율로 섞인다)
+    - blackhole/init_states/trap_init_state_air_v2.pkl
+    - blackhole/init_states/trap_init_state_ground_v2.pkl
+  
+  tarSpeedMin: .5
+  tarSpeedMax: 5
+  headingChangeStepsMin: 100
+  headingChangeStepsMax: 200
+  enableRandHeading: True
+  enableTaskObs: True
+  relocate_dist: 2.0
+  
+  # test 전용 (학습 때는 무시): 리셋 때 이 확률로 넘어진 자세에서 시작. 0 = 끔 (fall_init.py)
+  FALL_INIT_PROB: 0.0
+  FALL_GRACE_STEPS: 90           # 넘어진 채 시작한 env 는 이 step 동안 넘어짐 / 핸드볼로 끝나지 않음 (30 Hz 에서 3 s)
+
+  asset:
+    assetRoot: "calm/data/assets"
+    assetFileName: "mjcf/amp_humanoid_shoe.xml"
+
+  # ball + ground (plane) physics: calm/data/cfg/soccer_hlc/ball/<ballProfile>.yaml
+  # (dribble_legacy = settings of the checkpoints trained before 2026-10-29)
+  ballProfile: linear_damping_and_mjfriction
+  ballOverrides: {}
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 2.0   # Ball Mastery 실측: 처리량 동일, GPU 메모리 피크 감소
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
+
+
+evaluation:
+  task: "dribble"
+  change_steps: 150 # after change_steps change to next testcase. 30 step is 1 sec for default.
+  batch_num: 100
+  batch_size: 30
+  gain_criteria_frame: 10
+  criteria_angle: 10 #degree
+  criteria_speed: 0.5 #m/s
+  criteria_speed: 0.5 #m

@@ -1,0 +1,27 @@
+motions:
+- file: AA_Soccer_Player_DSpeedUp_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FShoot_L_calm_crop.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FShoot_R_calm_crop.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FallDownB_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_FallDownF_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_GShoot_L_calm_crop.npy
+  weight: 0.2
+- file: AA_Soccer_Player_GShoot_R_calm_crop.npy
+  weight: 0.2
+- file: AA_Soccer_Player_GetUp_FDown_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_GetUp_FUp_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_SlideTackle_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_SlideTackle_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_Waiting01_calm_Test.npy
+  weight: 0.2
+- file: AA_Soccer_Player_Waiting02_calm.npy
+  weight: 0.2

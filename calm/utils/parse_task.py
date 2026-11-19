@@ -41,10 +41,16 @@ from env.tasks.humanoid_strike_fsm import HumanoidStrikeFSM
 from env.tasks.humanoid_location_fsm import HumanoidLocationFSM
 from env.tasks.vec_task_wrappers import VecTaskPythonWrapper
 
+from env.tasks.soccer_hlc.humanoid_ball_mastery import HumanoidBallMastery
 from env.tasks.soccer_hlc.humanoid_ball_pos_task_1 import HumanoidBallPos_1
 from env.tasks.soccer_hlc.humanoid_dribble import HumanoidDribble
+from env.tasks.soccer_hlc.humanoid_dribble_fix import HumanoidDribble_Fix
+from env.tasks.soccer_hlc.humanoid_dribble_face import HumanoidDribbleFace
 from env.tasks.soccer_hlc.humanoid_move import HumanoidMove
+from env.tasks.soccer_hlc.humanoid_move_style import HumanoidMoveStyle
 from env.tasks.soccer_hlc.humanoid_trapping_3 import HumanoidTrapping_3
+from env.tasks.soccer_hlc.humanoid_trap_fix import HumanoidTrap_Fix
+from env.tasks.soccer_hlc.humanoid_kick_fix import HumanoidKick_Fix
 
 from isaacgym import rlgpu
 

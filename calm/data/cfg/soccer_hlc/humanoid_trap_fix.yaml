@@ -1,0 +1,131 @@
+# HumanoidTrap_Fix 전용 env cfg. humanoid_trapping_3.yaml 을 바탕으로 했고 설계는 trap_fix_plan.md.
+#   episodeLength 는 아래 공 설정으로 계산해 덮어쓴다 (기본값이면 99 step).
+#   공: ballProfile, plane 은 프로필의 ground 값으로 덮어쓴다.
+# if given, will override the device setting in gym.
+env:
+  numEnvs: 4096
+  envSpacing: 5
+  episodeLength: 99              # 무시됨 (HumanoidTrap_Fix 가 계산)
+  isFlagrun: False
+  enableDebugVis: False
+
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Default"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  numAMPEncObsSteps: 60
+
+  localRootObs: True
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot", "right_thigh", "right_shin", "left_thigh", "left_shin"]  # 넘어짐 판정용
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+
+  # HumanoidTrapping_3.__init__ 이 읽는 값 (Trap_Fix 에서는 쓰지 않음)
+  headingChangeStepsMin: 100
+  headingChangeStepsMax: 200
+  enableRandHeading: True
+  enableTaskObs: True
+  initialBallDistMin: 10
+  initialBallDistMax: 15
+  initialBallSpeedMin: 5
+  initialBallSpeedMax: 10
+  initialBallHeightMin: 0
+  initialBallHeightMax: 4
+  initialBallSpeedZMin: 0
+  initialBallSpeedZMax: 2
+  tarSpeedMin: .5
+  tarSpeedMax: 5
+
+  AIR_RATIO: 0.5                 # 리셋 때 공중볼 확률 (나머지 땅볼)
+
+  # 공중볼
+  AIR_INIT: trapping                  # fix: AIR_* / FALL_* 로 해석해 발사 / trapping: HumanoidTrapping_3 방식 (착지 반경 2-4 m, 중심 vel*0.5, 경험식 속도 보정. AIR_SPEED_*, AIR_PHI_* 만 쓰고 AIR_SPIN_MAX, FALL_* 안 씀. 원본 값은 속도 10-15, 각 15-60)
+  AIR_SPEED_MIN: 10.0             # 공칭 발사 속도 [m/s] (감쇠 보정 전)
+  AIR_SPEED_MAX: 15.0
+  AIR_PHI_MIN: 15.0              # 발사각 [deg]
+  AIR_PHI_MAX: 60.0
+  AIR_SPIN_MAX: 30.0             # 각 축 U(-max, max) [rad/s]
+
+  # 땅볼
+  GROUND_ARRIVE_SPEED_MIN: 3.0   # 조준점 도착 속도 [m/s]
+  GROUND_ARRIVE_SPEED_MAX: 15.0
+  GROUND_T_MIN: 1.0              # 도착 시간 [s]
+  GROUND_T_MAX: 2.0
+  GROUND_SPIN_NOISE: 10.0        # 구름 각속도에 더하는 수평 두 축 노이즈 U(-max, max) [rad/s]
+  GROUND_SPIN_Z_MAX: 15.0        # 수직축 U(-max, max) [rad/s]
+  GROUND_PHI_MIN: 0.0            # 발사각 [deg]. v_z = 발사 속도 * tan(phi), 수평 속도는 그대로
+  GROUND_PHI_MAX: 1.0
+  PASS_DIST: 1.0                 # 공이 진행 방향으로 캐릭터를 이만큼 지나면 실패 [m]
+
+  # 착지점 범위: max_fall_dist = min(FALL_DIST_PER_SEC * T, FALL_DIST_CAP), 중심 = root + root_vel * min(T, FALL_LEAD_TIME_MAX)
+  FALL_DIST_PER_SEC: 2.5
+  FALL_DIST_CAP: 4.0
+  FALL_LEAD_TIME_MAX: 0.1        # 캐릭터 속도로 중심을 옮기는 시간 상한 [s] (원본 0.5). 초기 위치에서 최대 약 4.5 m
+
+  # 트래핑 판정 / 종료
+  BALL_FORCE_THR: 0.1            # 공중볼: control step 중 simulate() 마다 읽은 공 net contact force 최대 [N]
+  TRAP_IMPULSE_THR: 0.5          # 공중볼: 또는 바닥으로 설명되지 않는 공 충격량 (질량당, control step 당) [m/s]. Kick_Fix KICK_DV_THR 와 같은 식
+  TRAP_MIN_HEIGHT: 0           # 공중볼: 트래핑은 step 끝 공 중심 높이가 이보다 클 때만 [m] (Trapping_3 와 같음). null 이면 높이를 보지 않음
+  GROUND_DV_THR: 1.0             # 땅볼: control step 당 공 수평 속도 변화 [m/s]
+  TRAP_NEAR_MARGIN: 0.05         # 공중볼: 공 표면이 다리 (허벅지, 정강이, 발) 표면에서 이 거리 안이면 바닥 근처 접촉도 트래핑 [m]
+  HANDBALL_BODIES: ["right_upper_arm", "right_lower_arm", "right_hand",
+                    "left_upper_arm", "left_lower_arm", "left_hand"]
+  HANDBALL_FORCE_THR: 1.0        # [N]
+  TRAP_WINDOW_STEPS: 10
+  EPISODE_MARGIN: 0.5            # [s]
+
+  # 성공 로그 (보상에는 안 씀)
+  SUCCESS_REL_SPEED: 1.5
+  SUCCESS_DIST: 1.0
+
+  # 관측: 공 위치 3 + 속도 3 + 각속도 3 (+ one-hot 8) (+ 목표 공 방향 2 + 속력 1)
+  OBS_ONEHOT: True               # 목표 부위 one-hot. False 면 pre 보상 거리는 root 와 공의 수평 거리
+  POST_TARGET_VEL: False          # 트래핑 후 목표 공 속도. 보상도 목표 속도 기준으로 바뀐다 (아래 POST_TAR_*)
+
+  # 보상
+  TARGET_POINT: joint              # geom: 목표 부위 geom 중심 / joint: 관절 위치 (원본 방식, 허벅지 목표 제외)
+  PRE_NEAR_W: 1                # 트래핑 전 보상 = PRE_NEAR_W * face * exp(-PRE_NEAR_SCALE * d(목표 부위, 공))
+  WINDOW_PRE_W: 1             # 트래핑 후 창에서도 같은 pre 보상을 이 가중치로 (post 에 더함). 0 = 끔
+  PRE_NEAR_SCALE: 10.0
+  FACE_FLOOR: 0.0                # 0 = 공을 등지면 사실상 0
+  FACE_ERR_SCALE: 4.0
+  POST_W: 0
+  POST_VEL_SCALE: 2.0
+  POST_VEL_Z: False              # True: 트래핑 후 보상에 공 z 속도도 넣음 |(v_ball_xy - v_root_xy, v_ball_z)|
+  POST_TAR_AZ_RANGE: 60.0       # 목표 공 방향 = 공이 날아온 쪽 (-launch_dir) ± 이 값 [deg]
+  POST_TAR_SPEED_MIN: 0.5        # 목표 공 속력 [m/s]
+  POST_TAR_SPEED_MAX: 4.0
+  POST_TAR_ZERO_PROB: 0.4        # 이 확률로 목표 속력 0: 보상은 |v_ball_xy - v_root_xy| (캐릭터와 같이 움직이게)
+  POST_TAN_W: 0.1                # 목표 속력 > 0: |err|² = (목표 방향 성분 - 목표 속력)² + POST_TAN_W * (수직 성분)²
+
+  # test 전용 (학습 때는 무시): 리셋 때 이 확률로 넘어진 자세에서 시작. 0 = 끔 (fall_init.py)
+  FALL_INIT_PROB: 0.0
+  FALL_GRACE_STEPS: 90           # 넘어진 채 시작한 env 는 이 step 동안 넘어짐 / 핸드볼로 끝나지 않음 (30 Hz 에서 3 s)
+
+  asset:
+    assetRoot: "calm/data/assets"
+    assetFileName: "mjcf/amp_humanoid_shoe.xml"
+
+  # ball + ground (plane) physics: calm/data/cfg/soccer_hlc/ball/<ballProfile>.yaml
+  ballProfile: linear_damping_and_mjfriction
+  ballOverrides: {}
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 2.0
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

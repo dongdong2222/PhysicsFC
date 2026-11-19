@@ -1,0 +1,27 @@
+motions:
+- file: AA_Soccer_Player_DTurnJogR_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DribbleF_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DribbleB_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJog_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DribbleF_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DribbleB_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogL_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogR_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogL_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogB_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DTurnJogB_L_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DribbleR_R_calm.npy
+  weight: 0.2
+- file: AA_Soccer_Player_DribbleL_L_calm.npy
+  weight: 0.2
