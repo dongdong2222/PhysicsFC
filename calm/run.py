@@ -46,6 +46,7 @@ from learning import hrl_agent
 from learning import hrl_players
 from learning import hrl_models
 from learning import hrl_network_builder
+from learning import hrl_soccer_conditioned_agent
 
 from learning import calm_agent
 from learning import calm_players
@@ -98,15 +99,55 @@ def create_rlgpu_env(**kwargs):
     return env
 
 
+class WandbEpochWriter:
+    """Wraps the agent's TensorBoard writer: everything still goes to TensorBoard, and each epoch's scalars go
+    to wandb in one wandb.log (step = epoch). common_agent writes 'performance/total_fps' first in every epoch's
+    logging block, so that tag starts a new epoch; the last epoch is sent on close()."""
+    EPOCH_START_TAG = 'performance/total_fps'
+
+    def __init__(self, writer):
+        self._writer = writer
+        self._scalars = {}
+
+    def add_scalar(self, tag, value, global_step=None, *args, **kwargs):
+        if tag == self.EPOCH_START_TAG:
+            self.log_epoch()
+            self._scalars['frame'] = global_step
+        self._scalars[tag] = float(value)
+        return self._writer.add_scalar(tag, value, global_step, *args, **kwargs)
+
+    def log_epoch(self):
+        if 'info/epochs' in self._scalars:
+            wandb.log(self._scalars, step=int(self._scalars['info/epochs']))
+        self._scalars = {}
+
+    def close(self):
+        self.log_epoch()
+        return self._writer.close()
+
+    def __getattr__(self, name):
+        return getattr(self._writer, name)
+
+
 class RLGPUAlgoObserver(AlgoObserver):
     def __init__(self, use_successes=True):
         self.use_successes = use_successes
         return
 
     def after_init(self, algo):
+        if hasattr(self, 'algo'):
+            # HRLAgent builds its frozen LLC agent with this same observer; keep the training agent (and its writer)
+            return
         self.algo = algo
         self.consecutive_successes = torch_ext.AverageMeter(1, self.algo.games_to_track).to(self.algo.ppo_device)
+        if wandb is not None and wandb.run is not None:
+            self.algo.writer = WandbEpochWriter(self.algo.writer)
         self.writer = self.algo.writer
+        self.reward_terms = {}       # name -> AverageMeter of finished episodes' sums
+        self.reward_term_sums = {}   # name -> per-env sum over the running episode
+        self.reward_term_step_sums = {}  # name -> sum over all envs and steps of the current epoch
+        self.reward_term_step_count = 0
+        self.episode_stats = {}      # name -> AverageMeter of the value at the step each episode ended
         return
 
     def process_infos(self, infos, done_indices):
@@ -117,6 +158,28 @@ class RLGPUAlgoObserver(AlgoObserver):
             if self.use_successes and 'successes' in infos:
                 successes = infos['successes'].clone()
                 self.consecutive_successes.update(successes[done_indices].to(self.algo.ppo_device))
+            # per-step reward terms from the task (extras["reward_terms"]); with llc_steps > 1 only the
+            # last LLC step's terms arrive here
+            ids = done_indices.view(-1)
+            reward_terms = infos.get('reward_terms', {})
+            for name, r in reward_terms.items():
+                if name not in self.reward_term_sums:
+                    self.reward_term_sums[name] = r.new_zeros(r.shape)
+                    self.reward_terms[name] = torch_ext.AverageMeter(1, self.algo.games_to_track).to(self.algo.ppo_device)
+                    self.reward_term_step_sums[name] = r.new_zeros(())
+                sums = self.reward_term_sums[name]
+                sums += r
+                self.reward_terms[name].update(sums[ids].unsqueeze(-1).to(self.algo.ppo_device))
+                sums[ids] = 0
+                self.reward_term_step_sums[name] += r.sum()
+            if reward_terms:
+                self.reward_term_step_count += next(iter(reward_terms.values())).numel()
+            # per-episode values from the task (extras["episode_stats"]), read at the step the episode ended
+            for name, v in infos.get('episode_stats', {}).items():
+                if name not in self.episode_stats:
+                    self.episode_stats[name] = torch_ext.AverageMeter(1, self.algo.games_to_track).to(self.algo.ppo_device)
+                if len(ids) > 0:
+                    self.episode_stats[name].update(v[ids].unsqueeze(-1).to(self.algo.ppo_device))
         return
 
     def after_clear_stats(self):
@@ -129,6 +192,26 @@ class RLGPUAlgoObserver(AlgoObserver):
             self.writer.add_scalar('successes/consecutive_successes/mean', mean_con_successes, frame)
             self.writer.add_scalar('successes/consecutive_successes/iter', mean_con_successes, epoch_num)
             self.writer.add_scalar('successes/consecutive_successes/time', mean_con_successes, total_time)
+        if self.reward_terms and all(m.current_size > 0 for m in self.reward_terms.values()):
+            total = 0.0
+            for name, meter in self.reward_terms.items():
+                mean = meter.get_mean().item()
+                total += mean
+                self.writer.add_scalar(f'reward_terms/{name}', mean, frame)
+            self.writer.add_scalar('reward_terms/total', total, frame)
+        # per-step means over this epoch's rollout: change every epoch, even when no episode ended
+        if self.reward_term_step_count > 0:
+            total = 0.0
+            for name, step_sum in self.reward_term_step_sums.items():
+                mean = step_sum.item() / self.reward_term_step_count
+                total += mean
+                self.writer.add_scalar(f'reward_terms_step/{name}', mean, frame)
+                step_sum.zero_()
+            self.writer.add_scalar('reward_terms_step/total', total, frame)
+            self.reward_term_step_count = 0
+        for name, meter in self.episode_stats.items():
+            if meter.current_size > 0:
+                self.writer.add_scalar(f'episode_stats/{name}', meter.get_mean().item(), frame)
         return
 
 
@@ -208,6 +291,10 @@ def build_alg_runner(algo_observer):
     runner.model_builder.model_factory.register_builder('hrl', lambda network, **kwargs: hrl_models.ModelHRLContinuous(network))
     runner.model_builder.network_factory.register_builder('hrl', lambda **kwargs: hrl_network_builder.HRLBuilder())
 
+    # HumanoidMoveStyle: HRL + style reward (cosine similarity to the requested motion's LLC encoding); test uses the plain HRL player
+    runner.algo_factory.register_builder('hrl_soccer_conditioned', lambda **kwargs: hrl_soccer_conditioned_agent.HRLSoccerConditionedAgent(**kwargs))
+    runner.player_factory.register_builder('hrl_soccer_conditioned', lambda **kwargs: hrl_players.HRLPlayer(**kwargs))
+
     runner.algo_factory.register_builder('calm', lambda **kwargs: calm_agent.CALMAgent(**kwargs))
     runner.player_factory.register_builder('calm', lambda **kwargs: calm_players.CALMPlayer(**kwargs))
     runner.model_builder.model_factory.register_builder('calm', lambda network, **kwargs: calm_models.ModelCALMContinuous(network))
@@ -230,6 +317,10 @@ def main():
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_name = f"{args.wandb_run_name}_{time_str}"
+    if args.experiment != 'Base':
+        # --experiment names the output folder and the wandb run as is (no timestamp: a rerun overwrites the folder)
+        run_name = cfg_train['params']['config']['name']
+        cfg_train['params']['config']['full_experiment_name'] = run_name
     assert args.track and wandb or not args.track, "Tracking requires wandb to be installed."
 
     cfg_train['params']['seed'] = set_seed(cfg_train['params'].get("seed", -1), cfg_train['params'].get("torch_deterministic", False))
@@ -250,9 +341,9 @@ def main():
     cfg_train['params']['config']['train_dir'] = args.output_path
 
     if args.track:
+        # scalars reach wandb once per epoch through WandbEpochWriter, not through TensorBoard sync
         wandb.init(
             project=args.wandb_project_name,
-            sync_tensorboard=True,
             config=args,
             save_code=True,
             name=run_name,

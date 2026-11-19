@@ -132,7 +132,8 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 scaled_play_time = train_info['play_time']
                 curr_frames = self.curr_frames
                 self.frame += curr_frames
-                print(f'epoch: {epoch_num}')
+                total_h, total_s = divmod(int(total_time), 3600)
+                print(f'epoch: {epoch_num}  time: {sum_time:.2f} s  (total {total_h}:{total_s // 60:02d}:{total_s % 60:02d})')
                 if self.print_stats:
                     fps_step = curr_frames / scaled_play_time
                     fps_total = curr_frames / scaled_time

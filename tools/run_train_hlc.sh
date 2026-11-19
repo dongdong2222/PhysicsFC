@@ -17,6 +17,16 @@ python calm/run.py \
 --experiment move \
 --headless --track
 
+# move style (원본 PhysicsFC_project/calm에서 이식. 상황별 지정 모션과 latent의 cosine 유사도를 style reward로 사용)
+# python calm/run.py \
+# --task HumanoidMoveStyle \
+# --cfg_env calm/data/cfg/soccer_hlc/humanoid_move.yaml \
+# --cfg_train calm/data/cfg/train/rlg/hrl_humanoid_style_control.yaml \
+# --motion_file blackhole/motions/soccer_move_style.yaml \
+# --llc_checkpoint calm/calm_exp/checkpoints/llc/poseidon_90_100000.pth \
+# --experiment move_style \
+# --headless --track
+
 # dribble
 # python calm/run.py \
 # --task HumanoidDribble \
@@ -26,7 +36,29 @@ python calm/run.py \
 # --llc_checkpoint calm/calm_exp/checkpoints/llc/default.pth \
 # --llc_steps 1 \
 # --experiment dribble \
-# --headless --track
+# --headless --track --wandb_project_name hlp-dribble
+
+# dribble face (목표 방향을 보며 드리블)
+# python calm/run.py \
+# --task HumanoidDribbleFace \
+# --cfg_env calm/data/cfg/soccer_hlc/humanoid_dribble_face.yaml \
+# --cfg_train calm/data/cfg/train/rlg/hrl_humanoid.yaml \
+# --motion_file blackhole/motions/AA_Soccer_Player_FootStop_ML_calm.npy \
+# --llc_checkpoint calm/calm_exp/checkpoints/llc/default.pth \
+# --llc_steps 1 \
+# --experiment dribble_face \
+# --headless --track --wandb_project_name hlp-dribble-face
+
+# ball mastery (원터치)
+# python calm/run.py \
+# --task HumanoidBallMastery \
+# --cfg_env calm/data/cfg/soccer_hlc/humanoid_ball_mastery.yaml \
+# --cfg_train calm/data/cfg/train/rlg/hrl_humanoid.yaml \
+# --motion_file blackhole/motions/AA_Soccer_Player_FootStop_ML_calm.npy \
+# --llc_checkpoint calm/calm_exp/checkpoints/llc/default.pth \
+# --llc_steps 1 \
+# --experiment ball_mastery \
+# --headless --track --wandb_project_name hlp-ball-mastery
 
 # kick
 # python calm/run.py \
@@ -40,6 +72,17 @@ python calm/run.py \
 # --experiment kick \
 # --headless --track
 
+# kick fix (kick_fix_plan.md)
+# python calm/run.py \
+# --task HumanoidKick_Fix \
+# --cfg_env calm/data/cfg/soccer_hlc/humanoid_kick_fix.yaml \
+# --cfg_train calm/data/cfg/train/rlg/hrl_humanoid.yaml \
+# --motion_file blackhole/motions/AA_Soccer_Player_FreeKick01_RF_calm.npy \
+# --llc_checkpoint calm/calm_exp/checkpoints/llc/default.pth \
+# --llc_steps 1 \
+# --experiment kick_fix \
+# --headless --track --wandb_project_name hlp-kick-fix
+
 # trap
 # python calm/run.py \
 # --task HumanoidTrapping_3 \
@@ -51,3 +94,14 @@ python calm/run.py \
 # --episode_length 60 \
 # --experiment trap \
 # --headless --track
+
+# trap fix (trap_fix_plan.md, episodeLength 는 태스크가 계산)
+# python calm/run.py \
+# --task HumanoidTrap_Fix \
+# --cfg_env calm/data/cfg/soccer_hlc/humanoid_trap_fix.yaml \
+# --cfg_train calm/data/cfg/train/rlg/hrl_humanoid.yaml \
+# --motion_file blackhole/motions/AA_Soccer_Player_FootStop_ML_calm.npy \
+# --llc_checkpoint calm/calm_exp/checkpoints/llc/default.pth \
+# --llc_steps 1 \
+# --experiment trap_fix \
+# --headless --track --wandb_project_name hlp-trap-fix
