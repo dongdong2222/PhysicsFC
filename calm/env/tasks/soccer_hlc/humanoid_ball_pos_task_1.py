@@ -94,6 +94,13 @@ class HumanoidBallPos_1(humanoid_amp_task.HumanoidAMPTask):
         self._kill_flag = torch.zeros([self.num_envs], device=self.device, dtype=torch.float)
         self._far_flag = torch.zeros([self.num_envs], device=self.device, dtype=torch.float)
 
+        #########################################
+        self._is_play = not cfg['args'].train
+        self._buttons = None
+        self._axes = None
+        self._hat = None
+        #########################################
+
         return
 
     def get_task_obs_size(self):
@@ -122,6 +129,7 @@ class HumanoidBallPos_1(humanoid_amp_task.HumanoidAMPTask):
         asset_options.angular_damping = 0.05
         asset_options.linear_damping = 0.1
         asset_options.max_angular_velocity = 100.0
+        asset_options.density = 80.71
         asset_options.override_inertia = True
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
 
@@ -240,6 +248,11 @@ class HumanoidBallPos_1(humanoid_amp_task.HumanoidAMPTask):
 
     def _reset_target(self, env_ids):
         n = len(env_ids)
+        if self._is_play and n > 0:
+            # 직전 에피소드에서 공이 타겟에 가장 가까이 간 거리
+            miss_dist = self._nearest[env_ids].cpu().numpy()
+            print('> miss dist (m):', np.array2string(miss_dist, precision=2, suppress_small=True))
+
         if GOAL_TEST:
             self._measures_angle.extend([ang for ang in self._min_angle.cpu().numpy() if not np.isnan(ang)])
             self._measures_speed.extend(self._min_speed_diff.cpu().numpy())
@@ -320,7 +333,7 @@ class HumanoidBallPos_1(humanoid_amp_task.HumanoidAMPTask):
         self._target_states[env_ids, TARGET_INDEX, 10:13] = 0.0
         self._ori_dist = torch.pow(self._target_states[..., BALL_INDEX, :3] - self._target_states[..., TARGET_INDEX, :3], 2).sum(dim=-1).sqrt()
         self._ori_z = torch.abs(self._target_states[..., BALL_INDEX, 2] - self._target_states[..., TARGET_INDEX, 2])
-        self._nearest = torch.ones_like(self._target_states[..., 0, 0]) * 100
+        self._nearest[env_ids] = 100
         self._tar_speed[env_ids] = rand_speed
         self._fastest = torch.zeros_like(self._fastest)
         self._ori_direc = torch_norm(self._target_states[..., TARGET_INDEX, :3] - self._target_states[..., BALL_INDEX, :3], dim=1)
@@ -334,6 +347,33 @@ class HumanoidBallPos_1(humanoid_amp_task.HumanoidAMPTask):
             self._min_angle[env_ids] = torch.ones_like(self._target_states[..., 0, 0]) * 180
             self._min_speed_diff[env_ids] = torch.ones_like(self._target_states[..., 0, 0]) * 100
 
+        return
+
+    def _update_task(self):
+        # play mode 에서만 조이스틱으로 타겟을 조작. 누적 상태는 건드리지 않음
+        if not (self._is_play and self._axes):
+            return
+
+        left_x, left_y, left_trigger, right_x, right_y, right_trigger = self._axes
+        magnitude_left = min(float(np.sqrt(left_x * left_x + left_y * left_y)), 1.0)
+        # 트리거는 [-1, 1] 로 들어오므로 [0, 1] 로 정규화
+        trigger = (float(right_trigger) + 1.0) / 2.0
+
+        # 왼쪽 조이스틱 방향으로 타겟 방위, magnitude 로 타겟 높이를 설정
+        theta = float(np.arctan2(-left_y, left_x))
+        height = (self._tar_height_max - self._tar_height_min) * magnitude_left + self._tar_height_min
+
+        ball_pos = self._target_states[..., BALL_INDEX, :3]
+        self._target_states[..., TARGET_INDEX, 0] = ball_pos[..., 0] + self._tar_dist_max * np.cos(theta)
+        self._target_states[..., TARGET_INDEX, 1] = ball_pos[..., 1] + self._tar_dist_max * np.sin(theta)
+        self._target_states[..., TARGET_INDEX, 2] = height
+
+        # 오른쪽 트리거로 목표 속력을 설정
+        self._tar_speed[:] = (self._tar_speed_max - self._tar_speed_min) * trigger + self._tar_speed_min
+        self._ori_direc = torch_norm(self._target_states[..., TARGET_INDEX, :3] - ball_pos, dim=1)
+
+        self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states),
+                                                     gymtorch.unwrap_tensor(self._tar_actor_ids), len(self._tar_actor_ids))
         return
 
     def _reset_env_tensors(self, env_ids):
@@ -438,6 +478,11 @@ class HumanoidBallPos_1(humanoid_amp_task.HumanoidAMPTask):
     def set_latent_action(self, actions):
         self._latent_action = actions
         return
+
+    def set_command(self, buttons, axes, hat):
+        self._buttons = buttons
+        self._axes = axes
+        self._hat = hat
     
     def _draw_task(self):
         cols = np.array([[0.0, 1.0, 0.0]], dtype=np.float32)

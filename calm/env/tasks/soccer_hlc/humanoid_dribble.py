@@ -3,22 +3,23 @@ from torch.nn.functional import normalize as torch_norm
 
 import env.tasks.humanoid_amp as humanoid_amp
 import env.tasks.humanoid_amp_task as humanoid_amp_task
+from env.tasks.soccer_hlc.ball_physics import BallPhysicsMixin
 from utils import torch_utils
 
 from isaacgym import gymapi
 from isaacgym import gymtorch
 from isaacgym.torch_utils import *
 
-import json
 import pickle
-import os
 
 # hyper parameters
 INIT_BALL_DIST = None
+INIT_BALL_DIST_MIN = None
 INIT_BALL_Z = None
 BALL_REWARD_W = None
 HUMANOID_REWARD_W = None
 DIST_REWARD_W = None
+DIST_FRONT_OFFSET = None   # dist reward 기준점을 root 에서 heading 방향으로 이만큼 앞에 둔다 [m]. 0 = root
 IS_INIT_BY_FILE = None
 
 TAR_ACTOR_ID = 1
@@ -43,67 +44,26 @@ if IS_INIT_BY_FILE:
 
 ################3
 
-r1_buf, r2_buf, r3_buf = list(), list(), list()
-file_prefix = 'rewards_'
-file_path = f'{file_prefix}{os.getpid()}.json'
-
-def _cleanup_reward_logs(max_files=8):
-    reward_files = []
-    for name in os.listdir('.'):
-        if name.startswith(file_prefix) and name.endswith('.json'):
-            reward_files.append(name)
-
-    reward_files.sort(key=lambda path: os.path.getmtime(path), reverse=True)
-    for old_path in reward_files[max_files:]:
-        try:
-            os.remove(old_path)
-        except OSError:
-            pass
-
-_cleanup_reward_logs()
-if os.path.exists(file_path):
-    os.remove(file_path)
-
-def add_reward(*args):
-    global r1_buf, r2_buf, r3_buf
-    r1, r2, r3 = args
-    r1_buf.append(float(r1))
-    r2_buf.append(float(r2))
-    r3_buf.append(float(r3))
-
-    if len(r1_buf) > 10:
-        if not os.path.exists(file_path) or os.stat(file_path).st_size == 0:
-            data = {'r1':list(), 'r2':list(), 'r3':list()}  # 초기 빈 딕셔너리
-        else:
-            # 파일이 비어있지 않은 경우, 데이터 로드
-            with open(file_path, 'r') as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    data = {'r1':list(), 'r2':list(), 'r3':list()}
-        with open(file_path, 'w') as f:
-            data['r1'].extend(r1_buf)
-            data['r2'].extend(r2_buf)
-            data['r3'].extend(r3_buf)
-            json.dump(data, f)
-
-        r1_buf, r2_buf, r3_buf = list(), list(), list()
 #################3
 
-class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
+class HumanoidDribble(BallPhysicsMixin, humanoid_amp_task.HumanoidAMPTask):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         global INIT_BALL_DIST
+        global INIT_BALL_DIST_MIN
         global INIT_BALL_Z
         global BALL_REWARD_W
         global HUMANOID_REWARD_W
         global DIST_REWARD_W
+        global DIST_FRONT_OFFSET
         global IS_INIT_BY_FILE
         
         INIT_BALL_DIST = cfg["env"]["INIT_BALL_DIST"]
+        INIT_BALL_DIST_MIN = cfg["env"]["INIT_BALL_DIST_MIN"]
         INIT_BALL_Z = cfg["env"]["INIT_BALL_Z"]
         BALL_REWARD_W = cfg["env"]["BALL_REWARD_W"]
         HUMANOID_REWARD_W = cfg["env"]["HUMANOID_REWARD_W"]
         DIST_REWARD_W = cfg["env"]["DIST_REWARD_W"]
+        DIST_FRONT_OFFSET = cfg["env"].get("DIST_FRONT_OFFSET", 0.0)
         IS_INIT_BY_FILE = cfg["env"]["IS_INIT_BY_FILE"]
 
         self._tar_speed_min = cfg["env"]["tarSpeedMin"]
@@ -119,6 +79,8 @@ class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
         self._axes = None
         self._hat = None
         #########################################
+
+        self._setup_ball_profile(cfg)
 
         super().__init__(cfg=cfg,
                          sim_params=sim_params,
@@ -211,24 +173,8 @@ class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
 
         self._marker_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
 
-        ## ball
-        asset_root = "calm/data/assets/mjcf/"
-        asset_file = "soccer_ball.urdf"
-
-        asset_options = gymapi.AssetOptions()
-        asset_options.angular_damping = .5
-        asset_options.linear_damping = .2
-        asset_options.max_angular_velocity = 100.0
-        asset_options.override_inertia = True
-        asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
-
-        self._ball_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
-
-        shape_property = self.gym.get_asset_rigid_shape_properties(self._ball_asset)
-        shape_property[0].restitution = 1.0
-        shape_property[0].friction = .5
-        shape_property[0].rolling_friction = .5
-        self.gym.set_asset_rigid_shape_properties(self._ball_asset, shape_property)
+        ## ball (settings from cfg["env"]["ballProfile"])
+        self._ball_asset = self._create_ball_asset()
 
         ## sphere
         asset_root = "calm/data/assets/mjcf/"
@@ -342,6 +288,8 @@ class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
 
         self._target_pos = self._target_states[..., :3]
         self._target_vel = self._target_states[..., 7:10]
+
+        self._init_ball_friction(self._ball_handles, self._ball_actor_ids)
 
         return
     
@@ -496,7 +444,7 @@ class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
                                                  self._tar_facing_dir, ball_pos, self._prev_ball_pos, 
                                                  self._ball_target, self.dt)
         self.rew_buf[:] = r1 + r2 + r3
-        add_reward(r1.cpu().numpy().sum(), r2.cpu().numpy().sum(), r3.cpu().numpy().sum())
+        self.extras["reward_terms"] = {"ball": r1, "humanoid": r2, "dist": r3}  # logged by RLGPUAlgoObserver
 
         return
     
@@ -520,7 +468,6 @@ class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
             self.sample = np.random.choice(init_dof_pos.shape[0], size=len(env_ids))
         super()._reset_actors(env_ids)
         self._reset_ball(env_ids)
-        print("reset actors!", env_ids)
         return
     
     def _reset_default(self, env_ids):
@@ -549,7 +496,12 @@ class HumanoidDribble(humanoid_amp_task.HumanoidAMPTask):
             
             n = len(env_ids)
             root_pos = self._humanoid_root_states[env_ids, :3]
-            self._ball_states[env_ids, :3] = root_pos + torch.rand(size=root_pos.shape, device=self.device) - INIT_BALL_DIST
+            # 정사각형 샘플링은 공이 캐릭터 몸 안에 생길 수 있어 (다리/발 캡슐과 겹침) 리셋 직후
+            # 솔버의 침투 해소 임펄스가 공을 차 버린다. 최소 반경을 둔 환형으로 뽑는다.
+            theta = 2 * np.pi * torch.rand(n, device=self.device)
+            r = INIT_BALL_DIST_MIN + (INIT_BALL_DIST - INIT_BALL_DIST_MIN) * torch.rand(n, device=self.device)
+            self._ball_states[env_ids, 0] = root_pos[:, 0] + r * torch.cos(theta)
+            self._ball_states[env_ids, 1] = root_pos[:, 1] + r * torch.sin(theta)
             self._ball_states[env_ids, 2] = INIT_BALL_Z
             self._ball_states[env_ids, 7:10] = 0.0
             self._ball_states[env_ids, 10:13] = 0.0
@@ -646,6 +598,13 @@ def compute_heading_observations(root_states, tar_dir, tar_speed, tar_face_dir, 
     return obs
 
 
+def compute_dist_anchor(root_pos, root_rot):
+    # dist reward 기준점 (xy): root 에서 캐릭터 heading 방향으로 DIST_FRONT_OFFSET 만큼 앞
+    heading = torch_utils.calc_heading(root_rot)
+    front_dir = torch.stack([torch.cos(heading), torch.sin(heading)], dim=-1)
+    return root_pos[..., :2] + DIST_FRONT_OFFSET * front_dir
+
+
 #@torch.jit.script
 def compute_heading_reward(root_pos, prev_root_pos, root_rot, tar_dir, tar_speed, tar_face_dir, ball_pos, prev_ball_pos, ball_target, dt):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float) -> Tuple[Tensor, Tensor, Tensor]
@@ -695,7 +654,7 @@ def compute_heading_reward(root_pos, prev_root_pos, root_rot, tar_dir, tar_speed
 
     # ball pos err reward
     cur_ball_pos = ball_pos[..., :2]
-    dist_err = torch.pow(cur_ball_pos - root_pos[..., :2], 2).sum(dim=-1).sqrt()
+    dist_err = torch.pow(cur_ball_pos - compute_dist_anchor(root_pos, root_rot), 2).sum(dim=-1).sqrt()
     dist_reward = torch.exp(-pos_err_scale*dist_err)
 
     # reward = ball_reward_w * ball_reward + humanoid_reward_w * humanoid_reward + dist_reward_w * dist_reward

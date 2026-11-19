@@ -4,6 +4,7 @@ from torch.nn.functional import normalize as torch_norm
 import env.tasks.humanoid_amp as humanoid_amp
 import env.tasks.humanoid_amp_task as humanoid_amp_task
 from utils import torch_utils
+from env.tasks.soccer_hlc.ball_physics import BallPhysicsMixin
 
 from isaacgym import gymapi
 from isaacgym import gymtorch
@@ -69,8 +70,12 @@ def add_reward(*args):
 
 ######
         
-class HumanoidTrapping_3(humanoid_amp_task.HumanoidAMPTask):
+class HumanoidTrapping_3(BallPhysicsMixin, humanoid_amp_task.HumanoidAMPTask):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
+        # cfg["env"]["ballProfile"] 가 있으면 공 / 바닥 물성을 프로필로, 없으면 아래 하드코딩 값 그대로
+        self._ball_profile = None
+        if "ballProfile" in cfg["env"]:
+            self._setup_ball_profile(cfg)
         self._heading_change_steps_min = cfg["env"]["headingChangeStepsMin"]
         self._heading_change_steps_max = cfg["env"]["headingChangeStepsMax"]
         self._enable_rand_heading = cfg["env"]["enableRandHeading"]
@@ -217,24 +222,27 @@ class HumanoidTrapping_3(humanoid_amp_task.HumanoidAMPTask):
         self._marker_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
 
         ## ball
-        asset_root = "calm/data/assets/mjcf/"
-        asset_file = "soccer_ball.urdf"
+        if self._ball_profile is not None:
+            self._ball_asset = self._create_ball_asset()
+        else:
+            asset_root = "calm/data/assets/mjcf/"
+            asset_file = "soccer_ball.urdf"
 
-        asset_options = gymapi.AssetOptions()
-        asset_options.angular_damping = 0.05 #.5
-        asset_options.linear_damping = 0.1 #.2
-        asset_options.max_angular_velocity = 100.0
-        asset_options.density = 80.71
-        asset_options.override_inertia = True
-        asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+            asset_options = gymapi.AssetOptions()
+            asset_options.angular_damping = 0.05 #.5
+            asset_options.linear_damping = 0.1 #.2
+            asset_options.max_angular_velocity = 100.0
+            asset_options.density = 80.71
+            asset_options.override_inertia = True
+            asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
 
-        self._ball_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+            self._ball_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
 
-        shape_property = self.gym.get_asset_rigid_shape_properties(self._ball_asset)
-        shape_property[0].restitution = 0.8 #0.8
-        shape_property[0].friction = .2
-        shape_property[0].rolling_friction = .2
-        self.gym.set_asset_rigid_shape_properties(self._ball_asset, shape_property)
+            shape_property = self.gym.get_asset_rigid_shape_properties(self._ball_asset)
+            shape_property[0].restitution = 0.8 #0.8
+            shape_property[0].friction = .2
+            shape_property[0].rolling_friction = .2
+            self.gym.set_asset_rigid_shape_properties(self._ball_asset, shape_property)
 
         ## sphere
         asset_root = "calm/data/assets/mjcf/"
@@ -375,6 +383,8 @@ class HumanoidTrapping_3(humanoid_amp_task.HumanoidAMPTask):
         self._target_pos = self._target_states[..., :3]
         self._target_vel = self._target_states[..., 7:10]
 
+        if self._ball_profile is not None:
+            self._init_ball_friction(self._ball_handles, self._ball_actor_ids)
         return
     
 
@@ -680,17 +690,16 @@ class HumanoidTrapping_3(humanoid_amp_task.HumanoidAMPTask):
 
         super()._reset_actors(env_ids)
         
-        ratios = [1.0, .0]
-        sizes = [int(r * len(env_ids)) for r in ratios]
-        sizes[-1] += len(env_ids) - sum(sizes)
-        
+        air_ratio = 0.5  # env 마다 이 확률로 공중볼, 나머지 땅볼
+        is_air = torch.rand(len(env_ids), device=self.device) < air_ratio
+
         # if IS_GROUND_BALL:
         #     self._reset_ball_new_ground(env_ids)
         # else:
         #     self._reset_ball_new_2(env_ids)
 
-        self._reset_ball_new_2(env_ids[:sizes[0]])
-        self._reset_ball_new_ground(env_ids[sizes[0]:])
+        self._reset_ball_new_2(env_ids[is_air])
+        self._reset_ball_new_ground(env_ids[~is_air])
         return
     
     def _reset_default(self, env_ids):

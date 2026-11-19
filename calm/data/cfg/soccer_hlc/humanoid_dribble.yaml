@@ -21,11 +21,13 @@ env:
   enableEarlyTermination: False
 
   # hyper parameters
-  INIT_BALL_DIST: 0.5
+  INIT_BALL_DIST: 0.5            # 공 스폰 환형의 바깥 반경
+  INIT_BALL_DIST_MIN: 0.3        # 안쪽 반경. 이보다 가까우면 공이 몸 안에 생겨 리셋 때 튄다
   INIT_BALL_Z: 0.12
   BALL_REWARD_W: 0.6
   HUMANOID_REWARD_W: 0.2
   DIST_REWARD_W: 0.2
+  DIST_FRONT_OFFSET: 0.0        # dist reward 기준점 = root + 이 값 * heading 방향 [m]. 0 = root (기존과 같음)
   IS_INIT_BY_FILE: False
   
   tarSpeedMin: .5
@@ -40,10 +42,10 @@ env:
     assetRoot: "calm/data/assets"
     assetFileName: "mjcf/amp_humanoid_shoe.xml"
 
-  plane:
-    staticFriction: 1.0
-    dynamicFriction: 1.0
-    restitution: 0.2
+  # ball + ground (plane) physics: calm/data/cfg/soccer_hlc/ball/<ballProfile>.yaml
+  # (dribble_legacy = settings of the checkpoints trained before 2026-10-29)
+  ballProfile: only_mjfriction
+  ballOverrides: {}
 
 sim:
   substeps: 2
@@ -56,7 +58,7 @@ sim:
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 10.0
-    default_buffer_size_multiplier: 10.0
+    default_buffer_size_multiplier: 2.0   # Ball Mastery 실측: 처리량 동일, GPU 메모리 피크 감소
 
   flex:
     num_inner_iterations: 10

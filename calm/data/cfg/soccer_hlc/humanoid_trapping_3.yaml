@@ -2,7 +2,7 @@
 env: 
   numEnvs: 4096
   envSpacing: 5
-  episodeLength: 60
+  episodeLength: 90
   isFlagrun: False
   enableDebugVis: False
   
@@ -40,6 +40,11 @@ env:
     assetRoot: "calm/data/assets"
     assetFileName: "mjcf/amp_humanoid_shoe.xml"
 
+  # ball + ground (plane) physics: calm/data/cfg/soccer_hlc/ball/<ballProfile>.yaml
+  # 주석을 풀면 공 물성과 아래 plane 값을 프로필로 덮어쓴다. 없으면 태스크의 하드코딩 값 (기존 동작)
+  # ballProfile: linear_damping_and_mjfriction
+  # ballOverrides: {}
+
   plane:
     staticFriction: 1.0
     dynamicFriction: 1.0
@@ -56,7 +61,7 @@ sim:
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 10.0
-    default_buffer_size_multiplier: 10.0
+    default_buffer_size_multiplier: 2.0
 
   flex:
     num_inner_iterations: 10
